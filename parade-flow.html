@@ -1,0 +1,2863 @@
+<!doctype html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Parade Flow</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&family=Plus+Jakarta+Sans:wght@400;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            canvas: "#000000",
+            surface: "#200e0e",
+            "surface-2": "#2e1a1a",
+            "surface-3": "#462f2e",
+            primary: "#FF153C",
+            "primary-soft": "#ffb3b1",
+            text: "#fedad8",
+            muted: "#b3b3b3",
+            teal: "#6cd7db"
+          },
+          fontFamily: {
+            sans: ["Plus Jakarta Sans", "system-ui", "sans-serif"]
+          },
+          boxShadow: {
+            glow: "0 0 32px rgba(255, 21, 60, .24)"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100dvh;
+      background: #000;
+      color: #fedad8;
+      -webkit-tap-highlight-color: transparent;
+      overflow: hidden;
+    }
+    .material-symbols-outlined { font-variation-settings: "FILL" 0, "wght" 500; }
+    .app-shell {
+      min-height: 100dvh;
+      background: #000;
+    }
+    .screen {
+      position: absolute;
+      inset: 70px 0 0;
+      opacity: 0;
+      transform: translateX(28px) scale(.985);
+      pointer-events: none;
+      transition: opacity .38s ease, transform .48s cubic-bezier(.16, 1, .3, 1);
+      overflow: auto;
+    }
+    .screen.active {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+    .screen.leaving-back { transform: translateX(28px) scale(.985); }
+    .screen.leaving-forward { transform: translateX(-28px) scale(.985); }
+    .enter-rise { animation: rise .58s cubic-bezier(.16, 1, .3, 1) both; }
+    .stagger > * { animation: rise .54s cubic-bezier(.16, 1, .3, 1) both; }
+    .stagger > *:nth-child(2) { animation-delay: .05s; }
+    .stagger > *:nth-child(3) { animation-delay: .1s; }
+    .stagger > *:nth-child(4) { animation-delay: .15s; }
+    .stagger > *:nth-child(5) { animation-delay: .2s; }
+    .choice[aria-selected="true"] {
+      border-color: #FF153C;
+      background: rgba(255, 21, 60, .13);
+      box-shadow: 0 0 0 1px rgba(255, 21, 60, .32), 0 18px 40px rgba(0,0,0,.32);
+      transform: translateY(-4px);
+    }
+    .choice[aria-selected="true"] .material-symbols-outlined { color: #FF153C; font-variation-settings: "FILL" 1, "wght" 600; }
+    .review.choice[aria-selected="true"] strong { color: #fedad8; }
+    .game-card.selected {
+      border-color: #FF153C;
+      box-shadow: 0 0 0 1px rgba(255, 21, 60, .5), 0 24px 52px rgba(0,0,0,.48);
+      transform: translateY(-6px) scale(1.01);
+    }
+    .game-card {
+      background: #2e2e2e !important;
+      border-color: #3f3f3f !important;
+    }
+    .game-card:hover {
+      background: #383838 !important;
+    }
+    .game-card.is-filtered-out {
+      display: none;
+    }
+    .result-hero-card {
+      min-height: 560px;
+      position: relative;
+      overflow: hidden;
+    }
+    .results-grid {
+      display: grid;
+      gap: 20px;
+    }
+    @media (min-width: 1024px) {
+      .results-grid {
+        grid-template-columns: 1.05fr .675fr .675fr;
+        grid-template-rows: repeat(2, minmax(270px, 1fr));
+      }
+      .results-grid .result-hero-card {
+        grid-row: span 2;
+      }
+    }
+    .result-side-card {
+      min-height: 270px;
+      position: relative;
+      overflow: hidden;
+    }
+    .result-card-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      filter: saturate(1.08);
+      opacity: 1;
+      transform: none;
+      object-position: center;
+    }
+    .result-card-image.contain {
+      object-fit: cover;
+      padding: 0;
+      background: transparent;
+    }
+    .result-info {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      border: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.64) 20%, rgba(0,0,0,.84));
+      backdrop-filter: none;
+      border-radius: 0;
+      padding: 46px 14px 14px;
+      box-shadow: none;
+    }
+    .result-hero-card .result-info {
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 74px 22px 20px;
+    }
+    .result-description {
+      color: #d0d0d0;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .post-review-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+      min-height: 0;
+    }
+    .post-review-card {
+      min-height: 420px;
+      position: relative;
+      overflow: hidden;
+      border-radius: 12px;
+      background: #200e0e;
+      cursor: pointer;
+      transition: transform .24s ease, background .24s ease;
+    }
+    .post-review-card:hover {
+      transform: translateY(-4px);
+      background: #2e1a1a;
+    }
+    .post-review-card img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: .92;
+      transition: transform .3s ease, opacity .3s ease;
+    }
+    .post-review-card:hover img {
+      transform: scale(1.045);
+      opacity: 1;
+    }
+    .post-review-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.84));
+      pointer-events: none;
+    }
+    .post-review-badge {
+      position: absolute;
+      z-index: 2;
+      top: 16px;
+      left: 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      border: 1px solid #462f2e;
+      background: rgba(15,15,15,.74);
+      padding: 7px 11px;
+      color: #fedad8;
+      font-size: 12px;
+    }
+    .post-review-card-body {
+      position: absolute;
+      z-index: 2;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      padding: 18px;
+    }
+    @media (max-width: 820px) {
+      .post-review-grid { grid-template-columns: 1fr; }
+      .post-review-card { min-height: 260px; }
+    }
+    .progress-dot.active { background: #FF153C; width: 28px; }
+    .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    .explore-card {
+      min-height: 292px;
+      border-radius: 10px;
+      overflow: hidden;
+      background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      box-shadow: 0 12px 28px rgba(0,0,0,.42);
+      transition: transform .24s ease, box-shadow .24s ease, filter .24s ease;
+      cursor: pointer;
+      position: relative;
+    }
+    .explore-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 40px rgba(0,0,0,.54);
+      filter: brightness(1.06);
+    }
+    .explore-card img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      margin: 0;
+      filter: saturate(1.05);
+      transform: none;
+    }
+    .modal-image-pane {
+      min-height: 470px;
+      background: #2c333a;
+      overflow: hidden;
+      position: relative;
+    }
+    .modal-image-pane img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      max-height: none;
+      object-fit: cover;
+      filter: saturate(1.05);
+    }
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 38px;
+      height: 20px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.72);
+      padding: 0 9px;
+      font-size: 11px;
+      line-height: 1;
+      color: #fedad8;
+      white-space: nowrap;
+    }
+    .home-fab {
+      position: fixed;
+      right: 31px;
+      bottom: 30px;
+      z-index: 45;
+      border-radius: 999px;
+      background: #FF153C;
+      color: #fff;
+      padding: 18px 31px;
+      font-weight: 800;
+      box-shadow: 0 18px 38px rgba(0,0,0,.5), 0 0 22px rgba(255,21,60,.24);
+      transition: transform .2s ease, opacity .2s ease;
+    }
+    .home-fab:hover { transform: translateY(-2px); }
+    .home-fab:active { transform: scale(.97); }
+    .filter-chip[aria-pressed="true"] {
+      background: #FF153C;
+      border-color: #FF153C;
+      color: #fff;
+    }
+    .all-game-card.is-hidden {
+      display: none;
+    }
+    .review-game[aria-selected="true"] {
+      border-color: #FF153C;
+      background: rgba(255, 21, 60, .12);
+      color: #fff;
+      box-shadow: 0 0 0 1px rgba(255, 21, 60, .24);
+    }
+    .game-modal {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .22s ease;
+      background: rgba(0,0,0,.72);
+      backdrop-filter: blur(14px);
+    }
+    .game-modal.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .game-modal-panel {
+      transform: translateY(18px) scale(.98);
+      transition: transform .28s cubic-bezier(.16, 1, .3, 1);
+      max-width: min(960px, calc(100vw - 72px));
+      min-height: 470px;
+      border-color: rgba(255,21,60,.2);
+      background: #21080a;
+    }
+    .game-modal.open .game-modal-panel {
+      transform: none;
+    }
+    .modal-tag {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 5px;
+      background: rgba(255,255,255,.12);
+      color: #d4d4d4;
+      min-height: 32px;
+      padding: 0 14px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .modal-tag.primary {
+      color: #00e0a4;
+      border: 1px solid rgba(0,224,164,.45);
+      background: rgba(0,224,164,.08);
+    }
+    .modal-stat {
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      align-items: center;
+      gap: 12px;
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 720px) {
+      body { overflow: auto; }
+      .screen { inset-top: 64px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell relative min-h-dvh">
+    <header class="fixed top-0 left-0 right-0 z-50 h-[70px] bg-black px-4 md:px-8 flex items-center justify-between">
+      <button id="backBtn" class="w-11 h-11 rounded-full grid place-items-center text-text hover:bg-white/10 active:scale-95 transition" aria-label="뒤로">
+        <span class="material-symbols-outlined" id="navIcon">menu</span>
+      </button>
+      <div class="flex flex-1 items-center gap-3">
+        <button class="text-[30px] md:text-[32px] font-normal tracking-tight text-text active:scale-95 transition" id="headerTitle" type="button">게임 탐색</button>
+        <div class="hidden sm:flex items-center gap-2" id="progressDots">
+          <span class="progress-dot active h-2 w-2 rounded-full bg-white/25 transition-all"></span>
+          <span class="progress-dot h-2 w-2 rounded-full bg-white/25 transition-all"></span>
+          <span class="progress-dot h-2 w-2 rounded-full bg-white/25 transition-all"></span>
+          <span class="progress-dot h-2 w-2 rounded-full bg-white/25 transition-all"></span>
+          <span class="progress-dot h-2 w-2 rounded-full bg-white/25 transition-all"></span>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <button class="w-9 h-9 rounded-full grid place-items-center text-text hover:bg-white/10 active:scale-95 transition" aria-label="검색"><span class="material-symbols-outlined">search</span></button>
+        <button class="w-9 h-9 rounded-full grid place-items-center text-text hover:bg-white/10 active:scale-95 transition" aria-label="알림"><span class="material-symbols-outlined">notifications</span></button>
+        <div class="h-10 w-10 overflow-hidden rounded-full border border-primary/70 bg-surface-2">
+          <img class="h-full w-full object-cover" alt="프로필" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDd4N17NwQaeccijspaWS-vWsJB-2zWg8FF7pnDEkiEovlAgJkzhKPgpkhQJOIp7Sd4JsfNXPSc20AbfCYddGQB0bHwBjNR1hgA75Yu-rRiAxiaHB_huDzjw-6kg4_J5S4iu7_JftIxnt8XfBbnLAdtpTIF3feypXUeAOZWTTAo5SctWMnTicWneEkcT2eYvQJZnE-JJUYyZi_ZW6SOfO9v8uq0jJR36HVd3A3QukEG92EKiGt09JfwV3OTi1HHPLbKtxjw8PECnA">
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="screen active px-[34px] pb-28 pt-5" data-screen="home">
+        <div class="mx-auto max-w-[1116px]">
+          <div class="mb-6 flex items-end justify-between enter-rise">
+            <h1 class="text-[26px] font-normal tracking-tight text-text">인기 보드게임</h1>
+            <button class="next pr-2 text-sm font-normal text-primary transition hover:opacity-80" data-next="allGames">전체 보기</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-x-4 gap-y-6 md:grid-cols-5 stagger">
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#f5e28f,#1b1b16 76%);">
+              <img alt="레지스탕스 아발론" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0rk9zNKtzS29X0SUJpVT_WxemVRXyuVdbw_uYcH8dvq1zvWTC0BH7yaozxdoxDkEbEaL73r-M9VSjoPF2PaYBNRgpr-On0pR-6hCRornjH-3nQU9mxQNGX9mwHMZ1BMtodMXM-pni3fQ1_jLHY4dXGgaHsn-2XJ4R2H8PNEUHx_CN64P6YxS9AIqxUW6jFi_kP7P_PQKzJlil6bQ_Fz7Dn4q7so8roTgXyHeUwUEWDDhSBuEJiKspNCrXKaqZvKVtu59jucNCcQ">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">레지스탕스 아발론</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">5-10</span><span class="meta-pill">30</span><span class="meta-pill">심리/추리/파티</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#ffc900,#1e1700 78%);">
+              <img alt="스플렌더" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqdWigiDzoG99Vn6tHbodSXysQRaLDiw81_-CPIhcFZqs8RejL_uA0JJqlVSoG90_T1nZEGlpa-Zszm9Wov7LearaFdwBZyXyRID1Uyc7DhMBbUMsjj255PNCyXi4C32PEzVdCLSUJAQbUq9kJaoH-VjoKZmjqHNXB1W1-Fz7-BARFh9xqxMuieKmr2S190DHlrt-jVTXduJ6zXUd2CnB4awzrG88rexekt6VGVkjfXnzBAPGyCFdcDBgKlXmU0r3FSPq0dElVtg">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">스플렌더</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">30</span><span class="meta-pill">수학/재미</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#bfd8f3,#121821 78%);">
+              <img alt="루미큐브" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3qOd-DveOfnKU8IV7M3zGxGy5wcPNHXydasef0Xeu4biJMVmr5KL3Jhkmw_CmVfhuT8b3VXo_lK0RtR8kft-hkSae1YfBcZ89sqviI9QjrA8OVE1LSuIAL7ws8KjZkX3noRP9rTiHn6p_crcxpfeYiM6LaZdeZtWGewkjeDEB5breIY87p_uKteGWPC-SKUuZNwygWFledUKDANH_XvF5yTr_mx5va8xScsckVPJFRmDWmx25eCOXNKYct7mqYB8xDQiUzkDoWA">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">루미큐브</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">20</span><span class="meta-pill">수학/공간</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#dcecf2,#15191b 78%);">
+              <img alt="보난자" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlZX4FJmA1NqYU4al6kSmT3FDhASTcJiAWFe1f37S7HLSjXLnOBFqBXmt7IL1nXj0d22XdUtsfkbtN4Xb8aZmIlkSdgjd72zEFHndyLPMhMAGGwwU8qpPl6mksNNWvKwjM83tzeGw1JQVjwvmD_FXnZ-s6SkWAgMRhRy02FlmYvmhN3dfS0OwUXXSdBrddv0v1cxiCAQsTvuJu73eB-42UMnGoJpqMofT_dtM38kOjW6oQsY_c47U19tYC2H4PjNdYmzVw9zqk2w">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">보난자</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">3-5</span><span class="meta-pill">45</span><span class="meta-pill">파티/심리</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#bddcff,#121a25 78%);">
+              <img alt="텔레스트레이션" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHZRGTIPQF30qSuWAOcxCE6Ldcd5Tqp5nKgc7SjVhluywIYHK5wiNrLDKYouNodxONm6Wci-gfxT4vxSTpNF3v5BJYvpOr1a7Nl7_btuMNZ_63n3IkSOsgq6SwIx-eB5IHfvYYG99vRA6VWDgaCipgSS_T6W7yIUDIeoMiizt706lqU_Gnn4EbVcQeBeyqLWopwfz4wmDBssv7b-XPu99LCPnhICD0jgYJV_dTyktvsctfhcnXvAcniUCy0JvuNjTMpslQ0niVkQ">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">텔레스트레이션</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">4-8</span><span class="meta-pill">20</span><span class="meta-pill">파티/공간</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#7ea2c9,#101720 78%);">
+              <img alt="배틀쉽" src="assets/boardgames/배틀쉽.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">배틀쉽</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2</span><span class="meta-pill">30</span><span class="meta-pill">전략/추리</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#232323,#050505 78%);">
+              <img alt="티츄 블랙" src="assets/boardgames/티츄___블랙.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">티츄 블랙</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">4</span><span class="meta-pill">60</span><span class="meta-pill">카드/전략</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#c7a26b,#1e1309 78%);">
+              <img alt="달무티" src="assets/boardgames/달무티.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">달무티</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">4-8</span><span class="meta-pill">20</span><span class="meta-pill">파티/카드</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#a86f49,#160d09 78%);">
+              <img alt="도미니언" src="assets/boardgames/도미니언.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">도미니언</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">30</span><span class="meta-pill">전략/카드</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#4a515b,#0a0b0d 78%);">
+              <img alt="광기의 저택" src="assets/boardgames/광기의_저택.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">광기의 저택</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">1-5</span><span class="meta-pill">120</span><span class="meta-pill">협력/추리</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#ffde68,#221902 78%);">
+              <img alt="코코너츠" src="assets/boardgames/코코너츠.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">코코너츠</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">20</span><span class="meta-pill">액션/가족</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#d94848,#1c0707 78%);">
+              <img alt="폭탄돌리기" src="assets/boardgames/폭탄돌리기.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">폭탄돌리기</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2-8</span><span class="meta-pill">15</span><span class="meta-pill">파티/순발력</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#6e88bb,#101420 78%);">
+              <img alt="마블 챔피언스" src="assets/boardgames/마블_챔피언스_카드게임.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">마블 챔피언스</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">1-4</span><span class="meta-pill">60</span><span class="meta-pill">협력/카드</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#bc8f62,#1b1008 78%);">
+              <img alt="버건디의 성" src="assets/boardgames/버건디의_성.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">버건디의 성</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">90</span><span class="meta-pill">전략/타일</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#d49d55,#1a0f07 78%);">
+              <img alt="7원더스 대결" src="assets/boardgames/7원더스_대결.png">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">7원더스 대결</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2</span><span class="meta-pill">30</span><span class="meta-pill">전략/문명</span></div>
+              </div>
+            </article>
+
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#f5e28f,#1b1b16 76%);">
+              <img alt="레지스탕스 아발론" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0rk9zNKtzS29X0SUJpVT_WxemVRXyuVdbw_uYcH8dvq1zvWTC0BH7yaozxdoxDkEbEaL73r-M9VSjoPF2PaYBNRgpr-On0pR-6hCRornjH-3nQU9mxQNGX9mwHMZ1BMtodMXM-pni3fQ1_jLHY4dXGgaHsn-2XJ4R2H8PNEUHx_CN64P6YxS9AIqxUW6jFi_kP7P_PQKzJlil6bQ_Fz7Dn4q7so8roTgXyHeUwUEWDDhSBuEJiKspNCrXKaqZvKVtu59jucNCcQ">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">레지스탕스 아발론</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">5-10</span><span class="meta-pill">30</span><span class="meta-pill">심리/추리/파티</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#ffc900,#1e1700 78%);">
+              <img alt="스플렌더" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqdWigiDzoG99Vn6tHbodSXysQRaLDiw81_-CPIhcFZqs8RejL_uA0JJqlVSoG90_T1nZEGlpa-Zszm9Wov7LearaFdwBZyXyRID1Uyc7DhMBbUMsjj255PNCyXi4C32PEzVdCLSUJAQbUq9kJaoH-VjoKZmjqHNXB1W1-Fz7-BARFh9xqxMuieKmr2S190DHlrt-jVTXduJ6zXUd2CnB4awzrG88rexekt6VGVkjfXnzBAPGyCFdcDBgKlXmU0r3FSPq0dElVtg">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">스플렌더</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">30</span><span class="meta-pill">수학/재미</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#bfd8f3,#121821 78%);">
+              <img alt="루미큐브" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3qOd-DveOfnKU8IV7M3zGxGy5wcPNHXydasef0Xeu4biJMVmr5KL3Jhkmw_CmVfhuT8b3VXo_lK0RtR8kft-hkSae1YfBcZ89sqviI9QjrA8OVE1LSuIAL7ws8KjZkX3noRP9rTiHn6p_crcxpfeYiM6LaZdeZtWGewkjeDEB5breIY87p_uKteGWPC-SKUuZNwygWFledUKDANH_XvF5yTr_mx5va8xScsckVPJFRmDWmx25eCOXNKYct7mqYB8xDQiUzkDoWA">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">루미큐브</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">20</span><span class="meta-pill">수학/공간</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#dcecf2,#15191b 78%);">
+              <img alt="보난자" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlZX4FJmA1NqYU4al6kSmT3FDhASTcJiAWFe1f37S7HLSjXLnOBFqBXmt7IL1nXj0d22XdUtsfkbtN4Xb8aZmIlkSdgjd72zEFHndyLPMhMAGGwwU8qpPl6mksNNWvKwjM83tzeGw1JQVjwvmD_FXnZ-s6SkWAgMRhRy02FlmYvmhN3dfS0OwUXXSdBrddv0v1cxiCAQsTvuJu73eB-42UMnGoJpqMofT_dtM38kOjW6oQsY_c47U19tYC2H4PjNdYmzVw9zqk2w">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">보난자</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">3-5</span><span class="meta-pill">45</span><span class="meta-pill">파티/심리</span></div>
+              </div>
+            </article>
+            <article class="explore-card relative" style="background:linear-gradient(135deg,#bddcff,#121a25 78%);">
+              <img alt="텔레스트레이션" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHZRGTIPQF30qSuWAOcxCE6Ldcd5Tqp5nKgc7SjVhluywIYHK5wiNrLDKYouNodxONm6Wci-gfxT4vxSTpNF3v5BJYvpOr1a7Nl7_btuMNZ_63n3IkSOsgq6SwIx-eB5IHfvYYG99vRA6VWDgaCipgSS_T6W7yIUDIeoMiizt706lqU_Gnn4EbVcQeBeyqLWopwfz4wmDBssv7b-XPu99LCPnhICD0jgYJV_dTyktvsctfhcnXvAcniUCy0JvuNjTMpslQ0niVkQ">
+              <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+                <h2 class="truncate text-[18px] leading-5 text-text">텔레스트레이션</h2>
+                <div class="mt-2 flex gap-2"><span class="meta-pill">4-8</span><span class="meta-pill">20</span><span class="meta-pill">파티/공간</span></div>
+              </div>
+            </article>
+          </div>
+
+          <button class="next home-fab" data-next="conditions">추천받기</button>
+        </div>
+      </section>
+
+      <section class="screen px-[34px] pb-28 pt-5" data-screen="allGames">
+        <div class="mx-auto max-w-[1116px]">
+          <div class="mb-6 flex flex-col gap-5 enter-rise">
+            <div class="flex items-end justify-between">
+              <div>
+                <h1 class="text-[28px] font-normal tracking-tight text-text">전체 보드게임</h1>
+                <p class="mt-2 text-sm text-muted">장르를 선택하면 해당 게임만 볼 수 있습니다.</p>
+              </div>
+              <button class="next rounded-full bg-primary px-6 py-3 font-bold text-white shadow-glow" data-next="conditions">추천받기</button>
+            </div>
+            <div class="flex flex-wrap gap-2" id="allGameFilters">
+              <button class="filter-chip rounded-full border border-white/15 bg-surface-2 px-4 py-2 text-sm text-text transition" aria-pressed="true" data-filter="all">전체</button>
+              <button class="filter-chip rounded-full border border-white/15 bg-surface-2 px-4 py-2 text-sm text-text transition" aria-pressed="false" data-filter="재미">재미</button>
+              <button class="filter-chip rounded-full border border-white/15 bg-surface-2 px-4 py-2 text-sm text-text transition" aria-pressed="false" data-filter="추리">추리</button>
+              <button class="filter-chip rounded-full border border-white/15 bg-surface-2 px-4 py-2 text-sm text-text transition" aria-pressed="false" data-filter="액션">액션</button>
+              <button class="filter-chip rounded-full border border-white/15 bg-surface-2 px-4 py-2 text-sm text-text transition" aria-pressed="false" data-filter="심리">심리</button>
+              <button class="filter-chip rounded-full border border-white/15 bg-surface-2 px-4 py-2 text-sm text-text transition" aria-pressed="false" data-filter="전략">전략</button>
+              <button class="filter-chip rounded-full border border-white/15 bg-surface-2 px-4 py-2 text-sm text-text transition" aria-pressed="false" data-filter="수학">수학</button>
+              <button class="filter-chip rounded-full border border-white/15 bg-surface-2 px-4 py-2 text-sm text-text transition" aria-pressed="false" data-filter="공간">공간</button>
+              <button class="filter-chip rounded-full border border-white/15 bg-surface-2 px-4 py-2 text-sm text-text transition" aria-pressed="false" data-filter="파티">파티</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-x-4 gap-y-6 md:grid-cols-5 stagger" id="allGameGrid">
+            <article class="all-game-card explore-card relative" data-tags="심리 추리 파티" style="background:linear-gradient(135deg,#f5e28f,#1b1b16 76%);"><img alt="레지스탕스 아발론" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0rk9zNKtzS29X0SUJpVT_WxemVRXyuVdbw_uYcH8dvq1zvWTC0BH7yaozxdoxDkEbEaL73r-M9VSjoPF2PaYBNRgpr-On0pR-6hCRornjH-3nQU9mxQNGX9mwHMZ1BMtodMXM-pni3fQ1_jLHY4dXGgaHsn-2XJ4R2H8PNEUHx_CN64P6YxS9AIqxUW6jFi_kP7P_PQKzJlil6bQ_Fz7Dn4q7so8roTgXyHeUwUEWDDhSBuEJiKspNCrXKaqZvKVtu59jucNCcQ"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">레지스탕스 아발론</h2><div class="mt-2 flex gap-2"><span class="meta-pill">5-10</span><span class="meta-pill">30</span><span class="meta-pill">심리/추리/파티</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="수학 재미" style="background:linear-gradient(135deg,#ffc900,#1e1700 78%);"><img alt="스플렌더" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqdWigiDzoG99Vn6tHbodSXysQRaLDiw81_-CPIhcFZqs8RejL_uA0JJqlVSoG90_T1nZEGlpa-Zszm9Wov7LearaFdwBZyXyRID1Uyc7DhMBbUMsjj255PNCyXi4C32PEzVdCLSUJAQbUq9kJaoH-VjoKZmjqHNXB1W1-Fz7-BARFh9xqxMuieKmr2S190DHlrt-jVTXduJ6zXUd2CnB4awzrG88rexekt6VGVkjfXnzBAPGyCFdcDBgKlXmU0r3FSPq0dElVtg"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">스플렌더</h2><div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">30</span><span class="meta-pill">수학/재미</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="수학 공간" style="background:linear-gradient(135deg,#bfd8f3,#121821 78%);"><img alt="루미큐브" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3qOd-DveOfnKU8IV7M3zGxGy5wcPNHXydasef0Xeu4biJMVmr5KL3Jhkmw_CmVfhuT8b3VXo_lK0RtR8kft-hkSae1YfBcZ89sqviI9QjrA8OVE1LSuIAL7ws8KjZkX3noRP9rTiHn6p_crcxpfeYiM6LaZdeZtWGewkjeDEB5breIY87p_uKteGWPC-SKUuZNwygWFledUKDANH_XvF5yTr_mx5va8xScsckVPJFRmDWmx25eCOXNKYct7mqYB8xDQiUzkDoWA"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">루미큐브</h2><div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">20</span><span class="meta-pill">수학/공간</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="파티 심리" style="background:linear-gradient(135deg,#dcecf2,#15191b 78%);"><img alt="보난자" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlZX4FJmA1NqYU4al6kSmT3FDhASTcJiAWFe1f37S7HLSjXLnOBFqBXmt7IL1nXj0d22XdUtsfkbtN4Xb8aZmIlkSdgjd72zEFHndyLPMhMAGGwwU8qpPl6mksNNWvKwjM83tzeGw1JQVjwvmD_FXnZ-s6SkWAgMRhRy02FlmYvmhN3dfS0OwUXXSdBrddv0v1cxiCAQsTvuJu73eB-42UMnGoJpqMofT_dtM38kOjW6oQsY_c47U19tYC2H4PjNdYmzVw9zqk2w"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">보난자</h2><div class="mt-2 flex gap-2"><span class="meta-pill">3-5</span><span class="meta-pill">45</span><span class="meta-pill">파티/심리</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="파티 공간" style="background:linear-gradient(135deg,#bddcff,#121a25 78%);"><img alt="텔레스트레이션" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHZRGTIPQF30qSuWAOcxCE6Ldcd5Tqp5nKgc7SjVhluywIYHK5wiNrLDKYouNodxONm6Wci-gfxT4vxSTpNF3v5BJYvpOr1a7Nl7_btuMNZ_63n3IkSOsgq6SwIx-eB5IHfvYYG99vRA6VWDgaCipgSS_T6W7yIUDIeoMiizt706lqU_Gnn4EbVcQeBeyqLWopwfz4wmDBssv7b-XPu99LCPnhICD0jgYJV_dTyktvsctfhcnXvAcniUCy0JvuNjTMpslQ0niVkQ"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">텔레스트레이션</h2><div class="mt-2 flex gap-2"><span class="meta-pill">4-8</span><span class="meta-pill">20</span><span class="meta-pill">파티/공간</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="액션 심리" style="background:linear-gradient(135deg,#cfa36b,#1c120b 78%);"><img alt="뱅" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8FQzsiNEKs2vHZJWyJt3zf-7f_5Mr9PRAKLIToAA5F6DAkqg0ggxvwgS1JtvwlwSInCeOL4SD0_0JnPRR6sMfucbpndr54y70i3-7rrZHTnyyum08T89EuUMV0utgwroBDHLB9Te-WXd48N-1udmNkeaUm-YRc45O-4V9ClDeu3EIPBeIoxFFy-IDO7QV3L85D0MP-A2w5c43_N1GA4_Ab6Mf0nHzDxfc4nX832wpreZipzaPmUxGO32NACdtOcVStRunBQIpJQ"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">뱅</h2><div class="mt-2 flex gap-2"><span class="meta-pill">4-7</span><span class="meta-pill">40</span><span class="meta-pill">액션/심리</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="전략 추리" style="background:linear-gradient(135deg,#7ea2c9,#101720 78%);"><img alt="배틀쉽" src="assets/boardgames/배틀쉽.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">배틀쉽</h2><div class="mt-2 flex gap-2"><span class="meta-pill">2</span><span class="meta-pill">30</span><span class="meta-pill">전략/추리</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="전략 심리" style="background:linear-gradient(135deg,#232323,#050505 78%);"><img alt="티츄 블랙" src="assets/boardgames/티츄___블랙.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">티츄 블랙</h2><div class="mt-2 flex gap-2"><span class="meta-pill">4</span><span class="meta-pill">60</span><span class="meta-pill">전략/심리</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="파티 심리" style="background:linear-gradient(135deg,#c7a26b,#1e1309 78%);"><img alt="달무티" src="assets/boardgames/달무티.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">달무티</h2><div class="mt-2 flex gap-2"><span class="meta-pill">4-8</span><span class="meta-pill">20</span><span class="meta-pill">파티/심리</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="전략 재미" style="background:linear-gradient(135deg,#a86f49,#160d09 78%);"><img alt="도미니언" src="assets/boardgames/도미니언.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">도미니언</h2><div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">30</span><span class="meta-pill">전략/재미</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="추리 심리" style="background:linear-gradient(135deg,#4a515b,#0a0b0d 78%);"><img alt="광기의 저택" src="assets/boardgames/광기의_저택.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">광기의 저택</h2><div class="mt-2 flex gap-2"><span class="meta-pill">1-5</span><span class="meta-pill">120</span><span class="meta-pill">추리/심리</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="액션 재미" style="background:linear-gradient(135deg,#ffde68,#221902 78%);"><img alt="코코너츠" src="assets/boardgames/코코너츠.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">코코너츠</h2><div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">20</span><span class="meta-pill">액션/재미</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="파티 액션" style="background:linear-gradient(135deg,#d94848,#1c0707 78%);"><img alt="폭탄돌리기" src="assets/boardgames/폭탄돌리기.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">폭탄돌리기</h2><div class="mt-2 flex gap-2"><span class="meta-pill">2-8</span><span class="meta-pill">15</span><span class="meta-pill">파티/액션</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="전략 액션" style="background:linear-gradient(135deg,#6e88bb,#101420 78%);"><img alt="마블 챔피언스" src="assets/boardgames/마블_챔피언스_카드게임.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">마블 챔피언스</h2><div class="mt-2 flex gap-2"><span class="meta-pill">1-4</span><span class="meta-pill">60</span><span class="meta-pill">전략/액션</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="전략 공간" style="background:linear-gradient(135deg,#bc8f62,#1b1008 78%);"><img alt="버건디의 성" src="assets/boardgames/버건디의_성.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">버건디의 성</h2><div class="mt-2 flex gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">90</span><span class="meta-pill">전략/공간</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="전략 수학" style="background:linear-gradient(135deg,#d49d55,#1a0f07 78%);"><img alt="7원더스 대결" src="assets/boardgames/7원더스_대결.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">7원더스 대결</h2><div class="mt-2 flex gap-2"><span class="meta-pill">2</span><span class="meta-pill">30</span><span class="meta-pill">전략/수학</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="재미 파티" style="background:linear-gradient(135deg,#876ec5,#120d1f 78%);"><img alt="딕싯 디즈니" src="assets/boardgames/딕싯_디즈니_100주년_기념판.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">딕싯 디즈니</h2><div class="mt-2 flex gap-2"><span class="meta-pill">3-6</span><span class="meta-pill">30</span><span class="meta-pill">재미/파티</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="재미 전략" style="background:linear-gradient(135deg,#68b77d,#0d1b11 78%);"><img alt="하모니즈" src="assets/boardgames/하모니즈.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">하모니즈</h2><div class="mt-2 flex gap-2"><span class="meta-pill">1-4</span><span class="meta-pill">45</span><span class="meta-pill">재미/전략</span></div></div></article>
+            <article class="all-game-card explore-card relative" data-tags="재미 파티" style="background:linear-gradient(135deg,#cf5f5f,#1c0909 78%);"><img alt="원카드" src="assets/boardgames/원카드.png"><div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3"><h2 class="truncate text-[18px] leading-5 text-text">원카드</h2><div class="mt-2 flex gap-2"><span class="meta-pill">2-6</span><span class="meta-pill">15</span><span class="meta-pill">재미/파티</span></div></div></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen px-4 md:px-8 py-8" data-screen="conditions">
+        <div class="mx-auto max-w-5xl">
+          <div class="text-center mb-8 enter-rise">
+            <h2 class="text-3xl md:text-4xl font-extrabold text-white">플레이 조건을 설정해주세요</h2>
+            <p class="mt-3 text-muted">정확한 추천을 위해 필요합니다.</p>
+          </div>
+          <div class="grid md:grid-cols-2 gap-5 stagger">
+            <div class="rounded-2xl border border-white/10 bg-surface-2 p-8 text-center">
+              <span class="material-symbols-outlined text-primary text-5xl" style="font-variation-settings:'FILL' 1">groups</span>
+              <h3 class="mt-4 text-2xl font-bold text-white">플레이어 수</h3>
+              <div class="mt-7 mx-auto flex max-w-[230px] items-center justify-between rounded-full bg-black/30 p-2">
+                <button class="step w-12 h-12 rounded-full bg-surface-3 grid place-items-center active:scale-90 transition" data-target="players" data-delta="-1"><span class="material-symbols-outlined">remove</span></button>
+                <div><strong id="players" class="text-4xl text-white">4</strong><span class="ml-1 text-muted">명</span></div>
+                <button class="step w-12 h-12 rounded-full bg-surface-3 grid place-items-center active:scale-90 transition" data-target="players" data-delta="1"><span class="material-symbols-outlined">add</span></button>
+              </div>
+            </div>
+            <div class="rounded-2xl border border-white/10 bg-surface-2 p-8 text-center">
+              <span class="material-symbols-outlined text-teal text-5xl" style="font-variation-settings:'FILL' 1">schedule</span>
+              <h3 class="mt-4 text-2xl font-bold text-white">플레이 시간</h3>
+              <div class="mt-7 mx-auto flex max-w-[230px] items-center justify-between rounded-full bg-black/30 p-2">
+                <button class="step w-12 h-12 rounded-full bg-surface-3 grid place-items-center active:scale-90 transition" data-target="minutes" data-delta="-10"><span class="material-symbols-outlined">remove</span></button>
+                <div><strong id="minutes" class="text-4xl text-white">60</strong><span class="ml-1 text-muted">분</span></div>
+                <button class="step w-12 h-12 rounded-full bg-surface-3 grid place-items-center active:scale-90 transition" data-target="minutes" data-delta="10"><span class="material-symbols-outlined">add</span></button>
+              </div>
+            </div>
+          </div>
+          <button class="next mt-8 w-full rounded-xl bg-primary py-4 text-white font-bold text-lg shadow-glow active:scale-[.98] transition" data-next="genres">다음으로</button>
+        </div>
+      </section>
+
+      <section class="screen px-4 md:px-8 py-8" data-screen="genres">
+        <div class="mx-auto max-w-5xl">
+          <div class="text-center mb-8 enter-rise">
+            <h2 class="text-3xl md:text-4xl font-extrabold text-white">원하는 장르를 모두 선택해 주세요</h2>
+            <p class="mt-3 text-muted">선택한 취향은 추천 카드에 바로 반영됩니다.</p>
+          </div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 stagger" id="genreGrid">
+            <button class="choice rounded-xl border-2 border-white/10 bg-surface p-6 min-h-32 transition text-center" aria-selected="false"><span class="material-symbols-outlined text-4xl text-muted">sentiment_very_satisfied</span><strong class="mt-3 block text-xl text-white">재미</strong></button>
+            <button class="choice rounded-xl border-2 border-white/10 bg-surface p-6 min-h-32 transition text-center" aria-selected="false"><span class="material-symbols-outlined text-4xl text-muted">search</span><strong class="mt-3 block text-xl text-white">추리</strong></button>
+            <button class="choice rounded-xl border-2 border-white/10 bg-surface p-6 min-h-32 transition text-center" aria-selected="false"><span class="material-symbols-outlined text-4xl text-muted">sports_martial_arts</span><strong class="mt-3 block text-xl text-white">액션</strong></button>
+            <button class="choice rounded-xl border-2 border-white/10 bg-surface p-6 min-h-32 transition text-center" aria-selected="false"><span class="material-symbols-outlined text-4xl text-muted">psychology</span><strong class="mt-3 block text-xl text-white">심리</strong></button>
+            <button class="choice rounded-xl border-2 border-white/10 bg-surface p-6 min-h-32 transition text-center" aria-selected="false"><span class="material-symbols-outlined text-4xl text-muted">chess</span><strong class="mt-3 block text-xl text-white">전략</strong></button>
+            <button class="choice rounded-xl border-2 border-white/10 bg-surface p-6 min-h-32 transition text-center" aria-selected="false"><span class="material-symbols-outlined text-4xl text-muted">calculate</span><strong class="mt-3 block text-xl text-white">수학</strong></button>
+            <button class="choice rounded-xl border-2 border-white/10 bg-surface p-6 min-h-32 transition text-center" aria-selected="false"><span class="material-symbols-outlined text-4xl text-muted">view_in_ar</span><strong class="mt-3 block text-xl text-white">공간</strong></button>
+            <button class="choice rounded-xl border-2 border-white/10 bg-surface p-6 min-h-32 transition text-center" aria-selected="false"><span class="material-symbols-outlined text-4xl text-muted">celebration</span><strong class="mt-3 block text-xl text-white">파티</strong></button>
+          </div>
+          <div class="mt-8 grid gap-3 md:grid-cols-2">
+            <button class="next rounded-xl bg-primary py-4 text-white font-bold text-lg shadow-glow active:scale-[.98] transition flex items-center justify-center gap-2" data-next="results" data-recommendation-mode="genre">
+              <span class="material-symbols-outlined">category</span>
+              장르 적용 추천결과
+            </button>
+            <button class="next rounded-xl border border-white/15 bg-[#2e2e2e] py-4 text-white font-bold text-lg active:scale-[.98] transition hover:bg-[#383838] flex items-center justify-center gap-2" data-next="results" data-recommendation-mode="history">
+              <span class="material-symbols-outlined">auto_awesome</span>
+              AI 플레이 기록 추천
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen px-4 md:px-8 py-8" data-screen="results">
+        <div class="mx-auto max-w-7xl">
+          <div class="mb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-3 enter-rise">
+            <div>
+              <h2 class="text-3xl md:text-4xl font-extrabold text-white" id="resultsTitle">장르 기반 추천 결과</h2>
+              <p id="resultsConditionNote" class="mt-2 text-muted">4명 · 60분 이하 조건에 맞춘 결과</p>
+            </div>
+            <button class="next rounded-xl border border-primary text-primary px-5 py-3 font-bold active:scale-[.98] transition" data-next="genres">다시 선택</button>
+          </div>
+          <div id="noResults" class="hidden rounded-2xl border border-white/10 bg-surface-2 p-8 text-center text-muted">
+            조건에 맞는 추천 결과가 없습니다. 플레이 인원이나 시간을 조금 넓혀 다시 선택해 주세요.
+          </div>
+          <div class="results-grid">
+            <article class="game-card selected result-hero-card rounded-2xl border transition cursor-pointer" data-game="레지스탕스 아발론" data-min-players="5" data-max-players="10" data-time="30">
+              <img class="result-card-image contain" alt="레지스탕스 아발론" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0rk9zNKtzS29X0SUJpVT_WxemVRXyuVdbw_uYcH8dvq1zvWTC0BH7yaozxdoxDkEbEaL73r-M9VSjoPF2PaYBNRgpr-On0pR-6hCRornjH-3nQU9mxQNGX9mwHMZ1BMtodMXM-pni3fQ1_jLHY4dXGgaHsn-2XJ4R2H8PNEUHx_CN64P6YxS9AIqxUW6jFi_kP7P_PQKzJlil6bQ_Fz7Dn4q7so8roTgXyHeUwUEWDDhSBuEJiKspNCrXKaqZvKVtu59jucNCcQ">
+              <div class="result-info">
+                <div class="mb-2 flex flex-wrap gap-2"><span class="modal-tag primary">쉬움 난이도</span><span class="modal-tag">심리</span><span class="modal-tag">추리</span><span class="modal-tag">파티</span></div>
+                <h3 class="text-3xl font-extrabold text-white">레지스탕스 아발론</h3>
+                <p class="mt-2 text-primary font-bold">정체를 숨기는 팀 기반 심리 추리 게임</p>
+                <p class="result-description mt-3 text-base leading-7">정체를 숨긴 선과 악의 팀이 임무 성공과 방해를 두고 심리전을 펼치는 대표적인 사회적 추리 게임입니다. 대화, 설득, 의심이 재미의 중심입니다.</p>
+                <div class="mt-3 flex flex-wrap gap-2"><span class="meta-pill">5-10</span><span class="meta-pill">30</span><span class="meta-pill">심리/추리/파티</span></div>
+              </div>
+            </article>
+            <article class="game-card result-side-card rounded-2xl border transition cursor-pointer" data-game="뱅" data-min-players="4" data-max-players="7" data-time="40"><img class="result-card-image contain" alt="뱅" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC8FQzsiNEKs2vHZJWyJt3zf-7f_5Mr9PRAKLIToAA5F6DAkqg0ggxvwgS1JtvwlwSInCeOL4SD0_0JnPRR6sMfucbpndr54y70i3-7rrZHTnyyum08T89EuUMV0utgwroBDHLB9Te-WXd48N-1udmNkeaUm-YRc45O-4V9ClDeu3EIPBeIoxFFy-IDO7QV3L85D0MP-A2w5c43_N1GA4_Ab6Mf0nHzDxfc4nX832wpreZipzaPmUxGO32NACdtOcVStRunBQIpJQ"><div class="result-info"><h3 class="text-xl font-bold text-white">뱅</h3><p class="mt-1 text-primary text-sm font-bold">서부극 속 정체를 숨기는 카드 배틀 게임</p><p class="result-description mt-2 text-sm leading-6">서부극 역할을 숨기고 총격전과 심리전을 벌이는 카드 게임입니다.</p><div class="mt-3 flex flex-wrap gap-2"><span class="meta-pill">4-7</span><span class="meta-pill">40</span><span class="meta-pill">액션/심리</span></div></div></article>
+            <article class="game-card result-side-card rounded-2xl border transition cursor-pointer" data-game="스플렌더" data-min-players="2" data-max-players="4" data-time="30"><img class="result-card-image contain" alt="스플렌더" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBqdWigiDzoG99Vn6tHbodSXysQRaLDiw81_-CPIhcFZqs8RejL_uA0JJqlVSoG90_T1nZEGlpa-Zszm9Wov7LearaFdwBZyXyRID1Uyc7DhMBbUMsjj255PNCyXi4C32PEzVdCLSUJAQbUq9kJaoH-VjoKZmjqHNXB1W1-Fz7-BARFh9xqxMuieKmr2S190DHlrt-jVTXduJ6zXUd2CnB4awzrG88rexekt6VGVkjfXnzBAPGyCFdcDBgKlXmU0r3FSPq0dElVtg"><div class="result-info"><h3 class="text-xl font-bold text-white">스플렌더</h3><p class="mt-1 text-primary text-sm font-bold">보석을 모아 명성을 쌓는 엔진 빌딩 게임</p><p class="result-description mt-2 text-sm leading-6">보석 토큰을 모아 카드를 구매하고 점수를 만드는 엔진 빌딩 게임입니다.</p><div class="mt-3 flex flex-wrap gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">30</span><span class="meta-pill">수학/재미</span></div></div></article>
+            <article class="game-card result-side-card rounded-2xl border transition cursor-pointer" data-game="보난자" data-min-players="3" data-max-players="5" data-time="45"><img class="result-card-image contain" alt="보난자" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlZX4FJmA1NqYU4al6kSmT3FDhASTcJiAWFe1f37S7HLSjXLnOBFqBXmt7IL1nXj0d22XdUtsfkbtN4Xb8aZmIlkSdgjd72zEFHndyLPMhMAGGwwU8qpPl6mksNNWvKwjM83tzeGw1JQVjwvmD_FXnZ-s6SkWAgMRhRy02FlmYvmhN3dfS0OwUXXSdBrddv0v1cxiCAQsTvuJu73eB-42UMnGoJpqMofT_dtM38kOjW6oQsY_c47U19tYC2H4PjNdYmzVw9zqk2w"><div class="result-info"><h3 class="text-xl font-bold text-white">보난자</h3><p class="mt-1 text-primary text-sm font-bold">거래와 협상으로 콩을 키우는 카드 게임</p><p class="result-description mt-2 text-sm leading-6">콩 카드를 심고 거래하며 이득을 만드는 협상 카드 게임입니다.</p><div class="mt-3 flex flex-wrap gap-2"><span class="meta-pill">3-5</span><span class="meta-pill">45</span><span class="meta-pill">파티/심리</span></div></div></article>
+            <article class="game-card result-side-card rounded-2xl border transition cursor-pointer" data-game="루미큐브" data-min-players="2" data-max-players="4" data-time="20"><img class="result-card-image contain" alt="루미큐브" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3qOd-DveOfnKU8IV7M3zGxGy5wcPNHXydasef0Xeu4biJMVmr5KL3Jhkmw_CmVfhuT8b3VXo_lK0RtR8kft-hkSae1YfBcZ89sqviI9QjrA8OVE1LSuIAL7ws8KjZkX3noRP9rTiHn6p_crcxpfeYiM6LaZdeZtWGewkjeDEB5breIY87p_uKteGWPC-SKUuZNwygWFledUKDANH_XvF5yTr_mx5va8xScsckVPJFRmDWmx25eCOXNKYct7mqYB8xDQiUzkDoWA"><div class="result-info"><h3 class="text-xl font-bold text-white">루미큐브</h3><p class="mt-1 text-primary text-sm font-bold">두뇌를 깨우는 타일 조합 게임</p><p class="result-description mt-2 text-sm leading-6">숫자 타일을 조합하고 재배열하며 패를 내려놓는 퍼즐형 게임입니다.</p><div class="mt-3 flex flex-wrap gap-2"><span class="meta-pill">2-4</span><span class="meta-pill">20</span><span class="meta-pill">수학/공간</span></div></div></article>
+          </div>
+          <button id="resultsPlayButton" class="next mt-6 w-full rounded-xl bg-primary py-4 text-white font-bold text-lg shadow-glow active:scale-[.98] transition" data-next="play">선택한 게임 시작</button>
+        </div>
+      </section>
+
+      <section class="screen px-4 md:px-8 py-8" data-screen="play">
+        <div class="mx-auto max-w-3xl min-h-[calc(100dvh-120px)] flex flex-col items-center justify-center text-center enter-rise">
+          <span class="material-symbols-outlined text-primary text-7xl animate-pulse" style="font-variation-settings:'FILL' 1">sports_esports</span>
+          <h2 class="mt-4 text-4xl md:text-5xl font-extrabold text-white"><span id="playingGame">레지스탕스 아발론</span> 플레이 중</h2>
+          <p class="mt-4 text-muted text-lg">게임을 마쳤다면 종료 후 리뷰를 남겨주세요.</p>
+          <button class="next mt-9 rounded-xl bg-primary px-8 py-4 text-white font-bold text-lg shadow-glow active:scale-[.98] transition" data-next="review">게임 종료</button>
+        </div>
+      </section>
+
+      <section class="screen px-4 md:px-8 py-8" data-screen="review">
+        <div class="mx-auto flex min-h-[calc(100dvh-120px)] max-w-4xl flex-col items-center justify-center text-center enter-rise">
+          <div class="mb-8">
+            <p class="text-2xl font-extrabold text-[#4f2e2e]">게임 종료</p>
+            <h2 class="mt-3 text-3xl md:text-[40px] font-extrabold leading-tight text-[#fedad8]">해당 게임에 만족하셨나요?</h2>
+            <p id="reviewGameTitle" class="mt-3 text-sm font-bold text-primary-soft">레지스탕스 아발론</p>
+          </div>
+          <div id="reviewGamePicker" class="hidden">
+            <button class="review-game" aria-selected="true" data-game="레지스탕스 아발론">레지스탕스 아발론</button>
+            <button class="review-game" aria-selected="false" data-game="뱅">뱅</button>
+            <button class="review-game" aria-selected="false" data-game="스플렌더">스플렌더</button>
+            <button class="review-game" aria-selected="false" data-game="보난자">보난자</button>
+            <button class="review-game" aria-selected="false" data-game="루미큐브">루미큐브</button>
+          </div>
+          <div class="grid w-full max-w-[640px] grid-cols-2 gap-6">
+            <button class="review choice rounded-xl border-2 border-transparent bg-[#2e1a1a] p-8 min-h-[160px] transition active:scale-95" aria-selected="false" data-review="만족"><span class="material-symbols-outlined text-[54px] text-[#b3b3b3]">thumb_up</span><strong class="mt-3 block text-xl text-[#b3b3b3]">만족</strong></button>
+            <button class="review choice rounded-xl border-2 border-transparent bg-[#2e1a1a] p-8 min-h-[160px] transition active:scale-95" aria-selected="false" data-review="불만족"><span class="material-symbols-outlined text-[54px] text-[#b3b3b3]">thumb_down</span><strong class="mt-3 block text-xl text-[#b3b3b3]">불만족</strong></button>
+          </div>
+          <textarea id="reviewText" class="mt-10 h-32 w-full max-w-[840px] resize-none rounded-xl border border-[#5e3e3e] bg-[#2a1616] p-5 text-[#fedad8] placeholder:text-[#a3a3a3] focus:border-[#af8785] focus:ring-[#af8785]" placeholder="다른 유저를 위한 후기를 남겨주세요. (선택)"></textarea>
+          <button id="finishBtn" class="mt-12 w-full max-w-[480px] rounded-full bg-[#ff535a] py-5 text-[#200e0e] font-extrabold text-lg active:scale-[.98] transition">다음으로</button>
+        </div>
+      </section>
+
+      <section class="screen px-4 md:px-8 py-8" data-screen="done">
+        <div class="mx-auto flex min-h-[calc(100dvh-120px)] max-w-6xl flex-col enter-rise">
+          <h2 class="mb-8 text-center text-3xl md:text-[40px] font-extrabold text-[#fedad8]">이런 게임은 어때요?</h2>
+          <div class="post-review-grid flex-1" id="postReviewGrid"></div>
+          <div class="mt-9 flex flex-wrap justify-center gap-5">
+            <button class="next rounded-full border border-[#462f2e] bg-[#2e1a1a] px-8 py-4 font-bold text-[#fedad8] active:scale-95 transition hover:bg-[#3a2424]" data-next="home">처음으로</button>
+            <button class="next rounded-full bg-[#ff535a] px-10 py-4 font-bold text-[#200e0e] active:scale-95 transition hover:opacity-90" data-next="conditions">한번 더 하기</button>
+            <button class="next rounded-full border border-[#462f2e] bg-[#2e1a1a] px-8 py-4 font-bold text-[#fedad8] active:scale-95 transition hover:bg-[#3a2424]" data-next="allGames">다른 게임 선택</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast fixed left-1/2 top-1/2 z-[80] -translate-x-1/2 -translate-y-1/2 scale-95 rounded-full border border-white/10 bg-black/80 px-6 py-4 font-bold text-white opacity-0 backdrop-blur-xl transition">
+      만족도를 선택해주세요
+    </div>
+
+    <div id="gameModal" class="game-modal fixed inset-0 z-[90] px-4 py-6 flex items-center justify-center" aria-hidden="true">
+      <div class="absolute inset-0" id="modalBackdrop"></div>
+      <section class="game-modal-panel relative w-full overflow-hidden rounded-2xl border shadow-2xl">
+        <button id="modalClose" class="absolute right-6 top-6 z-10 grid h-12 w-12 place-items-center rounded-full bg-black text-white transition hover:bg-black/80" aria-label="닫기">
+          <span class="material-symbols-outlined text-[34px]">close</span>
+        </button>
+        <div class="grid md:grid-cols-[40%_60%]">
+          <div class="modal-image-pane">
+            <img id="modalImage" class="drop-shadow-2xl" alt="">
+          </div>
+          <div class="p-8 md:p-10">
+            <div id="modalMeta" class="mb-4 flex flex-wrap gap-3"></div>
+            <h2 id="modalTitle" class="text-[38px] font-extrabold leading-tight text-white">게임 이름</h2>
+            <p id="modalSubtitle" class="mt-3 text-lg font-bold text-primary">추천 부제</p>
+            <p id="modalDescription" class="mt-8 min-h-[112px] text-[18px] leading-9 text-[#d4d4d4]"></p>
+            <div class="my-7 h-px bg-white/12"></div>
+            <div class="grid grid-cols-2 gap-6">
+              <div class="modal-stat">
+                <span class="material-symbols-outlined text-primary text-[34px]">groups</span>
+                <span><span class="block text-sm text-[#8f8f8f]">플레이 권장 인원</span><strong id="modalPlayers" class="text-xl text-white">2-4인</strong></span>
+              </div>
+              <div class="modal-stat">
+                <span class="material-symbols-outlined text-primary text-[34px]">schedule</span>
+                <span><span class="block text-sm text-[#8f8f8f]">평균 소요 시간</span><strong id="modalTime" class="text-xl text-white">20분</strong></span>
+              </div>
+            </div>
+            <div class="mt-9 grid gap-4 sm:grid-cols-2">
+              <button id="modalRecommend" class="rounded-xl bg-[#383838] px-5 py-5 font-bold text-white active:scale-[.98] transition hover:bg-[#444] flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">auto_awesome</span>
+                맞춤 보드게임 추천받기
+              </button>
+              <button id="modalSelect" class="rounded-xl bg-primary px-5 py-5 font-bold text-white shadow-glow active:scale-[.98] transition flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined">play_arrow</span>
+                게임 시작하기
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    const order = ["home", "allGames", "conditions", "genres", "results", "play", "review", "done"];
+    const screens = [...document.querySelectorAll(".screen")];
+    const dots = [...document.querySelectorAll(".progress-dot")];
+    let current = "home";
+    let historyStack = ["home"];
+    let selectedGame = "레지스탕스 아발론";
+    let selectedReview = "";
+    let selectedReviewGame = "레지스탕스 아발론";
+    const reviewRatings = {};
+    let recommendationMode = "genre";
+    let modalGameName = "";
+    const gameDescriptions = {
+      "레지스탕스 아발론": "정체를 숨긴 선과 악의 팀이 임무 성공과 방해를 두고 심리전을 펼치는 대표적인 사회적 추리 게임입니다. 대화, 설득, 의심이 재미의 중심입니다.",
+      "스플렌더": "보석 토큰을 모아 카드를 구매하고 점수를 만드는 엔진 빌딩 게임입니다. 쉬운 규칙 안에서 효율 계산과 타이밍 싸움이 살아납니다.",
+      "루미큐브": "숫자 타일을 조합하고 재배열하며 패를 내려놓는 퍼즐형 가족 게임입니다. 수학적 감각과 공간 재구성이 중요합니다.",
+      "보난자": "콩 카드를 심고 거래하며 이득을 만드는 협상 카드 게임입니다. 서로의 필요를 읽고 거래 타이밍을 잡는 재미가 큽니다.",
+      "텔레스트레이션": "그림과 추측이 번갈아 이어지는 파티 게임입니다. 실수와 오해가 그대로 웃음으로 이어져 가볍게 즐기기 좋습니다.",
+      "뱅": "서부극 역할을 숨기고 총격전과 심리전을 벌이는 카드 게임입니다. 정체 추리와 공격 타이밍이 핵심입니다.",
+      "배틀쉽": "상대 함대의 위치를 추리하며 좌표를 공격하는 2인 전략 게임입니다. 단순하지만 읽기 싸움이 선명합니다.",
+      "티츄 블랙": "팀플레이와 카드 카운팅, 선언 타이밍이 중요한 전략 카드 게임입니다. 숙련될수록 파트너와의 호흡이 살아납니다.",
+      "달무티": "계급이 바뀌는 빠른 카드 게임입니다. 많은 인원이 가볍게 웃으며 즐기기 좋은 파티 카드 게임입니다.",
+      "도미니언": "덱을 직접 성장시키며 점수를 만드는 덱 빌딩 대표작입니다. 카드 조합과 장기 효율 선택이 중요합니다.",
+      "광기의 저택": "미스터리 저택을 탐험하며 사건을 해결하는 협력 추리 게임입니다. 분위기와 서사가 강한 긴 호흡의 게임입니다.",
+      "코코너츠": "원숭이 발사대로 컵에 코코넛을 넣는 액션 가족 게임입니다. 규칙이 쉽고 손맛이 좋아 누구나 바로 즐길 수 있습니다.",
+      "폭탄돌리기": "제한 시간과 압박 속에서 순발력을 겨루는 파티 게임입니다. 짧고 강한 긴장감이 장점입니다.",
+      "마블 챔피언스": "영웅 덱을 조합해 빌런에 맞서는 협력 카드 게임입니다. 캐릭터별 능력과 덱 구성이 재미를 만듭니다.",
+      "버건디의 성": "주사위 결과로 영지를 확장하는 전략 타일 게임입니다. 선택지는 많지만 차분히 최적화를 즐기기 좋습니다.",
+      "7원더스 대결": "2인 전용 문명 발전 게임입니다. 카드 선택, 자원 관리, 군사와 과학 압박이 촘촘하게 맞물립니다.",
+      "딕싯 디즈니": "그림 카드에 이야기를 붙여 서로의 상상을 맞히는 감성 파티 게임입니다.",
+      "하모니즈": "동물과 지형을 배치해 점수를 만드는 예쁜 전략 퍼즐 게임입니다.",
+      "원카드": "같은 숫자나 색을 이어 내는 쉬운 카드 게임입니다. 빠르게 배우고 가볍게 즐기기 좋습니다."
+    };
+    const gameSubtitles = {
+      "레지스탕스 아발론": "정체를 숨기는 팀 기반 심리 추리 게임",
+      "스플렌더": "보석을 모아 명성을 쌓는 엔진 빌딩 게임",
+      "루미큐브": "두뇌를 깨우는 타일 조합 게임",
+      "보난자": "거래와 협상으로 콩을 키우는 카드 게임",
+      "텔레스트레이션": "그림과 추측이 이어지는 폭소 파티 게임",
+      "뱅": "서부극 속 정체를 숨기는 카드 배틀 게임",
+      "배틀쉽": "좌표를 읽고 상대 함대를 찾는 추리 전략 게임",
+      "티츄 블랙": "팀 호흡과 선언이 중요한 전략 카드 게임",
+      "달무티": "계급이 뒤집히는 가벼운 파티 카드 게임",
+      "도미니언": "덱을 성장시키는 대표 덱 빌딩 게임",
+      "광기의 저택": "사건을 함께 해결하는 협력 미스터리 게임",
+      "코코너츠": "손맛이 살아있는 가족 액션 게임",
+      "폭탄돌리기": "시간 압박 속 순발력 파티 게임",
+      "마블 챔피언스": "히어로 덱으로 빌런에 맞서는 협력 카드 게임",
+      "버건디의 성": "영지를 확장하는 깊이 있는 타일 전략 게임",
+      "7원더스 대결": "두 명이 겨루는 문명 발전 전략 게임",
+      "딕싯 디즈니": "상상력으로 그림을 읽는 감성 파티 게임",
+      "하모니즈": "동물과 지형을 배치하는 아름다운 퍼즐 게임",
+      "원카드": "누구나 바로 즐기는 클래식 카드 게임"
+    };
+    const boardGames = [
+          {
+                name: "레지스탕스 아발론",
+                players: [
+                      5,
+                      10
+                ],
+                time: 30,
+                genres: [
+                      "심리",
+                      "추리",
+                      "파티"
+                ],
+                image: "assets/boardgames/레지스탕스_아발론.png",
+                bg: "linear-gradient(135deg,#f5e28f,#1b1b16 76%)"
+          },
+          {
+                name: "스플렌더",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "수학",
+                      "재미"
+                ],
+                image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBqdWigiDzoG99Vn6tHbodSXysQRaLDiw81_-CPIhcFZqs8RejL_uA0JJqlVSoG90_T1nZEGlpa-Zszm9Wov7LearaFdwBZyXyRID1Uyc7DhMBbUMsjj255PNCyXi4C32PEzVdCLSUJAQbUq9kJaoH-VjoKZmjqHNXB1W1-Fz7-BARFh9xqxMuieKmr2S190DHlrt-jVTXduJ6zXUd2CnB4awzrG88rexekt6VGVkjfXnzBAPGyCFdcDBgKlXmU0r3FSPq0dElVtg",
+                bg: "linear-gradient(135deg,#ffc900,#1e1700 78%)"
+          },
+          {
+                name: "루미큐브",
+                players: [
+                      2,
+                      4
+                ],
+                time: 20,
+                genres: [
+                      "수학",
+                      "공간"
+                ],
+                image: "https://lh3.googleusercontent.com/aida-public/AB6AXuC3qOd-DveOfnKU8IV7M3zGxGy5wcPNHXydasef0Xeu4biJMVmr5KL3Jhkmw_CmVfhuT8b3VXo_lK0RtR8kft-hkSae1YfBcZ89sqviI9QjrA8OVE1LSuIAL7ws8KjZkX3noRP9rTiHn6p_crcxpfeYiM6LaZdeZtWGewkjeDEB5breIY87p_uKteGWPC-SKUuZNwygWFledUKDANH_XvF5yTr_mx5va8xScsckVPJFRmDWmx25eCOXNKYct7mqYB8xDQiUzkDoWA",
+                bg: "linear-gradient(135deg,#bfd8f3,#121821 78%)"
+          },
+          {
+                name: "보난자",
+                players: [
+                      3,
+                      5
+                ],
+                time: 45,
+                genres: [
+                      "파티",
+                      "심리"
+                ],
+                image: "assets/boardgames/보난자.png",
+                bg: "linear-gradient(135deg,#dcecf2,#15191b 78%)"
+          },
+          {
+                name: "텔레스트레이션",
+                players: [
+                      4,
+                      8
+                ],
+                time: 20,
+                genres: [
+                      "파티",
+                      "공간"
+                ],
+                image: "https://lh3.googleusercontent.com/aida-public/AB6AXuAHZRGTIPQF30qSuWAOcxCE6Ldcd5Tqp5nKgc7SjVhluywIYHK5wiNrLDKYouNodxONm6Wci-gfxT4vxSTpNF3v5BJYvpOr1a7Nl7_btuMNZ_63n3IkSOsgq6SwIx-eB5IHfvYYG99vRA6VWDgaCipgSS_T6W7yIUDIeoMiizt706lqU_Gnn4EbVcQeBeyqLWopwfz4wmDBssv7b-XPu99LCPnhICD0jgYJV_dTyktvsctfhcnXvAcniUCy0JvuNjTMpslQ0niVkQ",
+                bg: "linear-gradient(135deg,#bddcff,#121a25 78%)"
+          },
+          {
+                name: "뱅",
+                players: [
+                      4,
+                      7
+                ],
+                time: 40,
+                genres: [
+                      "액션",
+                      "심리"
+                ],
+                image: "assets/boardgames/뱅.png",
+                bg: "linear-gradient(135deg,#cfa36b,#1c120b 78%)"
+          },
+          {
+                name: "배틀쉽",
+                players: [
+                      2,
+                      2
+                ],
+                time: 30,
+                genres: [
+                      "전략",
+                      "추리"
+                ],
+                image: "assets/boardgames/배틀쉽.png",
+                bg: "linear-gradient(135deg,#7ea2c9,#101720 78%)"
+          },
+          {
+                name: "티츄 블랙",
+                players: [
+                      4,
+                      4
+                ],
+                time: 60,
+                genres: [
+                      "전략",
+                      "심리"
+                ],
+                image: "assets/boardgames/티츄___블랙.png",
+                bg: "linear-gradient(135deg,#232323,#050505 78%)"
+          },
+          {
+                name: "달무티",
+                players: [
+                      4,
+                      8
+                ],
+                time: 20,
+                genres: [
+                      "파티",
+                      "심리"
+                ],
+                image: "assets/boardgames/달무티.png",
+                bg: "linear-gradient(135deg,#c7a26b,#1e1309 78%)"
+          },
+          {
+                name: "도미니언",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/도미니언.png",
+                bg: "linear-gradient(135deg,#a86f49,#160d09 78%)"
+          },
+          {
+                name: "광기의 저택",
+                players: [
+                      1,
+                      5
+                ],
+                time: 120,
+                genres: [
+                      "추리",
+                      "심리"
+                ],
+                image: "assets/boardgames/광기의_저택.png",
+                bg: "linear-gradient(135deg,#4a515b,#0a0b0d 78%)"
+          },
+          {
+                name: "코코너츠",
+                players: [
+                      2,
+                      4
+                ],
+                time: 20,
+                genres: [
+                      "액션",
+                      "재미"
+                ],
+                image: "assets/boardgames/코코너츠.png",
+                bg: "linear-gradient(135deg,#ffde68,#221902 78%)"
+          },
+          {
+                name: "폭탄돌리기",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "파티",
+                      "액션"
+                ],
+                image: "assets/boardgames/폭탄돌리기.png",
+                bg: "linear-gradient(135deg,#d94848,#1c0707 78%)"
+          },
+          {
+                name: "마블 챔피언스",
+                players: [
+                      1,
+                      4
+                ],
+                time: 60,
+                genres: [
+                      "전략",
+                      "액션"
+                ],
+                image: "assets/boardgames/마블_챔피언스_카드게임.png",
+                bg: "linear-gradient(135deg,#6e88bb,#101420 78%)"
+          },
+          {
+                name: "버건디의 성",
+                players: [
+                      2,
+                      4
+                ],
+                time: 90,
+                genres: [
+                      "전략",
+                      "공간"
+                ],
+                image: "assets/boardgames/버건디의_성.png",
+                bg: "linear-gradient(135deg,#bc8f62,#1b1008 78%)"
+          },
+          {
+                name: "7원더스 대결",
+                players: [
+                      2,
+                      2
+                ],
+                time: 30,
+                genres: [
+                      "전략",
+                      "수학"
+                ],
+                image: "assets/boardgames/7원더스_대결.png",
+                bg: "linear-gradient(135deg,#d49d55,#1a0f07 78%)"
+          },
+          {
+                name: "딕싯 디즈니",
+                players: [
+                      3,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/딕싯_디즈니_100주년_기념판.png",
+                bg: "linear-gradient(135deg,#876ec5,#120d1f 78%)"
+          },
+          {
+                name: "하모니즈",
+                players: [
+                      1,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/하모니즈.png",
+                bg: "linear-gradient(135deg,#68b77d,#0d1b11 78%)"
+          },
+          {
+                name: "원카드",
+                players: [
+                      2,
+                      6
+                ],
+                time: 15,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/원카드.png",
+                bg: "linear-gradient(135deg,#cf5f5f,#1c0909 78%)"
+          },
+          {
+                name: "젝스님트",
+                players: [
+                      2,
+                      10
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "심리"
+                ],
+                image: "assets/boardgames/젝스님트.png",
+                bg: "linear-gradient(135deg,#f16b55,#190707 78%)"
+          },
+          {
+                name: "마이 시티",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "전략",
+                      "공간"
+                ],
+                image: "assets/boardgames/마이_시티.jpg",
+                bg: "linear-gradient(135deg,#7bc0d2,#071519 78%)"
+          },
+          {
+                name: "요트 다이스",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "수학",
+                      "재미"
+                ],
+                image: "assets/boardgames/요트_다이스.png",
+                bg: "linear-gradient(135deg,#4fa7d8,#07111a 78%)"
+          },
+          {
+                name: "스코틀랜드 야드",
+                players: [
+                      3,
+                      6
+                ],
+                time: 45,
+                genres: [
+                      "추리",
+                      "전략"
+                ],
+                image: "assets/boardgames/스코틀랜드_야드.png",
+                bg: "linear-gradient(135deg,#5e6d7f,#090d12 78%)"
+          },
+          {
+                name: "젬블로 딜럭스",
+                players: [
+                      2,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/젬블로_딜럭스.png",
+                bg: "linear-gradient(135deg,#71c6c8,#071514 78%)"
+          },
+          {
+                name: "할리갈리",
+                players: [
+                      2,
+                      6
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "재미"
+                ],
+                image: "assets/boardgames/할리갈리.png",
+                bg: "linear-gradient(135deg,#ffc94d,#1b1204 78%)"
+          },
+          {
+                name: "도블",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/도블.png",
+                bg: "linear-gradient(135deg,#3a86ff,#071225 78%)"
+          },
+          {
+                name: "다빈치 코드 플러스",
+                players: [
+                      2,
+                      4
+                ],
+                time: 15,
+                genres: [
+                      "추리",
+                      "수학"
+                ],
+                image: "assets/boardgames/다빈치_코드_플러스.png",
+                bg: "linear-gradient(135deg,#d0d0d0,#101010 78%)"
+          },
+          {
+                name: "라비린스",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/라비린스.png",
+                bg: "linear-gradient(135deg,#437663,#071611 78%)"
+          },
+          {
+                name: "프로젝트 L",
+                players: [
+                      1,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/프로젝트_L.png",
+                bg: "linear-gradient(135deg,#111827,#020617 78%)"
+          },
+          {
+                name: "우봉고 3D",
+                players: [
+                      1,
+                      4
+                ],
+                time: 25,
+                genres: [
+                      "공간",
+                      "수학"
+                ],
+                image: "assets/boardgames/우봉고_3D.png",
+                bg: "linear-gradient(135deg,#ef9f39,#1c0d03 78%)"
+          },
+          {
+                name: "파라오코드",
+                players: [
+                      2,
+                      5
+                ],
+                time: 20,
+                genres: [
+                      "수학",
+                      "추리"
+                ],
+                image: "assets/boardgames/파라오코드.png",
+                bg: "linear-gradient(135deg,#cfac61,#171007 78%)"
+          },
+          {
+                name: "자이푸르",
+                players: [
+                      2,
+                      2
+                ],
+                time: 30,
+                genres: [
+                      "전략",
+                      "심리"
+                ],
+                image: "assets/boardgames/자이푸르.png",
+                bg: "linear-gradient(135deg,#d98b45,#1b0d05 78%)"
+          },
+          {
+                name: "시타델",
+                players: [
+                      2,
+                      8
+                ],
+                time: 45,
+                genres: [
+                      "심리",
+                      "전략"
+                ],
+                image: "assets/boardgames/시타델.png",
+                bg: "linear-gradient(135deg,#6b4f8a,#10091a 78%)"
+          },
+          {
+                name: "클라스크",
+                players: [
+                      2,
+                      2
+                ],
+                time: 10,
+                genres: [
+                      "액션",
+                      "재미"
+                ],
+                image: "assets/boardgames/클라스크.png",
+                bg: "linear-gradient(135deg,#111827,#030712 78%)"
+          },
+          {
+                name: "쿼리도 미니",
+                players: [
+                      2,
+                      4
+                ],
+                time: 15,
+                genres: [
+                      "전략",
+                      "공간"
+                ],
+                image: "assets/boardgames/쿼리도_미니.png",
+                bg: "linear-gradient(135deg,#c58c53,#170d05 78%)"
+          },
+          {
+                name: "아줄 마스터 쇼콜라티에",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "공간"
+                ],
+                image: "assets/boardgames/아줄___마스터_쇼콜라티에.png",
+                bg: "linear-gradient(135deg,#8b5e3c,#160d08 78%)"
+          },
+          {
+                name: "카탄 카드게임",
+                players: [
+                      2,
+                      4
+                ],
+                time: 60,
+                genres: [
+                      "전략",
+                      "심리"
+                ],
+                image: "assets/boardgames/카탄___카드게임.png",
+                bg: "linear-gradient(135deg,#d29b52,#1a0f06 78%)"
+          },
+          {
+                name: "오델로 클래식",
+                players: [
+                      2,
+                      2
+                ],
+                time: 20,
+                genres: [
+                      "전략",
+                      "공간"
+                ],
+                image: "assets/boardgames/오델로_클래식.png",
+                bg: "linear-gradient(135deg,#1f7a4d,#06130c 78%)"
+          },
+          {
+                name: "체스앤체커",
+                players: [
+                      2,
+                      2
+                ],
+                time: 30,
+                genres: [
+                      "전략",
+                      "수학"
+                ],
+                image: "assets/boardgames/체스앤체커.png",
+                bg: "linear-gradient(135deg,#d8d8d8,#111 78%)"
+          },
+          {
+                name: "라온",
+                players: [
+                      2,
+                      4
+                ],
+                time: 20,
+                genres: [
+                      "재미",
+                      "수학"
+                ],
+                image: "assets/boardgames/라온.png",
+                bg: "linear-gradient(135deg,#62b6cb,#06131a 78%)"
+          },
+          {
+                name: "도블 동물원",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/도블_동물원.png",
+                bg: "linear-gradient(135deg,#78c850,#0b1707 78%)"
+          },
+          {
+                name: "도블 마블",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/도블_마블.jpg",
+                bg: "linear-gradient(135deg,#cc2936,#160405 78%)"
+          },
+          {
+                name: "컬러레또",
+                players: [
+                      2,
+                      5
+                ],
+                time: 30,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/컬러레또.png",
+                bg: "linear-gradient(135deg,#f2c94c,#1b1303 78%)"
+          },
+          {
+                name: "젬블로",
+                players: [
+                      2,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/젬블로.png",
+                bg: "linear-gradient(135deg,#48cae4,#06151a 78%)"
+          },
+          {
+                name: "퀵소",
+                players: [
+                      2,
+                      4
+                ],
+                time: 15,
+                genres: [
+                      "전략",
+                      "공간"
+                ],
+                image: "assets/boardgames/퀵소.png",
+                bg: "linear-gradient(135deg,#b7b7a4,#11110c 78%)"
+          },
+          {
+                name: "스트라이크",
+                players: [
+                      2,
+                      5
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "재미"
+                ],
+                image: "assets/boardgames/스트라이크.png",
+                bg: "linear-gradient(135deg,#f77f00,#1b0d00 78%)"
+          },
+          {
+                name: "러시아워 쉬프트",
+                players: [
+                      2,
+                      2
+                ],
+                time: 20,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/러시아워_쉬프트.png",
+                bg: "linear-gradient(135deg,#e63946,#170406 78%)"
+          },
+          {
+                name: "세트 주니어",
+                players: [
+                      2,
+                      4
+                ],
+                time: 20,
+                genres: [
+                      "수학",
+                      "공간"
+                ],
+                image: "assets/boardgames/세트_주니어.png",
+                bg: "linear-gradient(135deg,#8ecae6,#07141a 78%)"
+          },
+          {
+                name: "라 보카",
+                players: [
+                      3,
+                      6
+                ],
+                time: 40,
+                genres: [
+                      "공간",
+                      "파티"
+                ],
+                image: "assets/boardgames/라_보카.png",
+                bg: "linear-gradient(135deg,#ffbe0b,#1c1300 78%)"
+          },
+          {
+                name: "보타닉 가든",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "공간"
+                ],
+                image: "assets/boardgames/보타닉_가든.png",
+                bg: "linear-gradient(135deg,#6a994e,#0b1707 78%)"
+          },
+          {
+                name: "13클루",
+                players: [
+                      2,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "추리",
+                      "심리"
+                ],
+                image: "assets/boardgames/13클루.png",
+                bg: "linear-gradient(135deg,#495057,#080a0c 78%)"
+          },
+          {
+                name: "15도",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "수학",
+                      "재미"
+                ],
+                image: "assets/boardgames/15도.webp",
+                bg: "linear-gradient(135deg,#22c55e,#071a0d 78%)"
+          },
+          {
+                name: "그래비트랙스 코어 스타터",
+                players: [
+                      2,
+                      4
+                ],
+                time: 25,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/그래비트랙스_코어_스타터.jpg",
+                bg: "linear-gradient(135deg,#f97316,#1a0c03 78%)"
+          },
+          {
+                name: "노 땡스 딜럭스",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/노_땡스_딜럭스.webp",
+                bg: "linear-gradient(135deg,#ef4444,#1a0505 78%)"
+          },
+          {
+                name: "마린월드",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/마린월드.png",
+                bg: "linear-gradient(135deg,#eab308,#1a1303 78%)"
+          },
+          {
+                name: "모자가 아니잖아",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/모자가_아니잖아.jpg",
+                bg: "linear-gradient(135deg,#14b8a6,#061716 78%)"
+          },
+          {
+                name: "사보타지",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/사보타지.webp",
+                bg: "linear-gradient(135deg,#6b7280,#111827 78%)"
+          },
+          {
+                name: "알쏭달 쏭열고래 신비로 운우주 편",
+                players: [
+                      2,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "추리",
+                      "심리"
+                ],
+                image: "assets/boardgames/알쏭달_쏭열고래_신비로_운우주_편.webp",
+                bg: "linear-gradient(135deg,#8b5cf6,#160b2e 78%)"
+          },
+          {
+                name: "유령 대소동",
+                players: [
+                      2,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "추리",
+                      "심리"
+                ],
+                image: "assets/boardgames/유령_대소동.jpg",
+                bg: "linear-gradient(135deg,#0ea5e9,#061420 78%)"
+          },
+          {
+                name: "응결게임",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/응결게임.webp",
+                bg: "linear-gradient(135deg,#22c55e,#071a0d 78%)"
+          },
+          {
+                name: "커피러시",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/커피러시.jpg",
+                bg: "linear-gradient(135deg,#f97316,#1a0c03 78%)"
+          },
+          {
+                name: "텀블링 몽키",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/텀블링_몽키.jpg",
+                bg: "linear-gradient(135deg,#ef4444,#1a0505 78%)"
+          },
+          {
+                name: "팬데믹",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/팬데믹.jpg",
+                bg: "linear-gradient(135deg,#eab308,#1a1303 78%)"
+          },
+          {
+                name: "광기의 저택 확장 뱀이 서린 길",
+                players: [
+                      2,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "추리",
+                      "심리"
+                ],
+                image: "assets/boardgames/광기의_저택_확장___뱀이_서린_길_2.png",
+                bg: "linear-gradient(135deg,#14b8a6,#061716 78%)"
+          },
+          {
+                name: "구십구",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "수학",
+                      "재미"
+                ],
+                image: "assets/boardgames/구십구.jpg",
+                bg: "linear-gradient(135deg,#6b7280,#111827 78%)"
+          },
+          {
+                name: "꼬마돼지 서커스",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/꼬마돼지_서커스.png",
+                bg: "linear-gradient(135deg,#8b5cf6,#160b2e 78%)"
+          },
+          {
+                name: "뉴 다이아몬드 게임",
+                players: [
+                      2,
+                      4
+                ],
+                time: 25,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/뉴_다이아몬드_게임.png",
+                bg: "linear-gradient(135deg,#0ea5e9,#061420 78%)"
+          },
+          {
+                name: "도전 스피드",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/도전_스피드_10.jpg",
+                bg: "linear-gradient(135deg,#22c55e,#071a0d 78%)"
+          },
+          {
+                name: "뒤죽박죽 서커스",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/뒤죽박죽_서커스-1.png",
+                bg: "linear-gradient(135deg,#f97316,#1a0c03 78%)"
+          },
+          {
+                name: "딕싯 디즈니 100주년 기념판",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/딕싯_디즈니_100주년_기념판-1.png",
+                bg: "linear-gradient(135deg,#ef4444,#1a0505 78%)"
+          },
+          {
+                name: "라비린스 디즈니 100주년 기념판",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/라비린스_디즈니_100주년_기념판.png",
+                bg: "linear-gradient(135deg,#eab308,#1a1303 78%)"
+          },
+          {
+                name: "레디 셋 벳",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/레디_셋_벳.png",
+                bg: "linear-gradient(135deg,#14b8a6,#061716 78%)"
+          },
+          {
+                name: "로보77",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "수학",
+                      "재미"
+                ],
+                image: "assets/boardgames/로보77.png",
+                bg: "linear-gradient(135deg,#6b7280,#111827 78%)"
+          },
+          {
+                name: "마블 챔피언스 카드게임",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/마블_챔피언스_카드게임_2.png",
+                bg: "linear-gradient(135deg,#8b5cf6,#160b2e 78%)"
+          },
+          {
+                name: "마카롱 스윗홀릭",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/마카롱_스윗홀릭.png",
+                bg: "linear-gradient(135deg,#0ea5e9,#061420 78%)"
+          },
+          {
+                name: "모두의 마블 베이직",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/모두의_마블_베이직.png",
+                bg: "linear-gradient(135deg,#22c55e,#071a0d 78%)"
+          },
+          {
+                name: "모두의 마블 이코노미",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/모두의_마블_이코노미.png",
+                bg: "linear-gradient(135deg,#f97316,#1a0c03 78%)"
+          },
+          {
+                name: "뭘까요 포켓몬",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/뭘까요_포켓몬.png",
+                bg: "linear-gradient(135deg,#ef4444,#1a0505 78%)"
+          },
+          {
+                name: "밀러스 할로우의 늑대인간",
+                players: [
+                      2,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "추리",
+                      "심리"
+                ],
+                image: "assets/boardgames/밀러스_할로우의_늑대인간.png",
+                bg: "linear-gradient(135deg,#eab308,#1a1303 78%)"
+          },
+          {
+                name: "뱅 확장 닷지시티",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/뱅_확장___닷지시티.png",
+                bg: "linear-gradient(135deg,#14b8a6,#061716 78%)"
+          },
+          {
+                name: "뱅 확장 확장판 모음",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/뱅_확장___확장판_모음.png",
+                bg: "linear-gradient(135deg,#6b7280,#111827 78%)"
+          },
+          {
+                name: "벌레가 싫어",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/벌레가_싫어.png",
+                bg: "linear-gradient(135deg,#8b5cf6,#160b2e 78%)"
+          },
+          {
+                name: "붐 폭탄게임",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/붐_폭탄게임-1.png",
+                bg: "linear-gradient(135deg,#0ea5e9,#061420 78%)"
+          },
+          {
+                name: "사과 사냥",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/사과_사냥.png",
+                bg: "linear-gradient(135deg,#22c55e,#071a0d 78%)"
+          },
+          {
+                name: "상어 아일랜드",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/상어_아일랜드.png",
+                bg: "linear-gradient(135deg,#f97316,#1a0c03 78%)"
+          },
+          {
+                name: "숲속의 음악대",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/숲속의_음악대-1.png",
+                bg: "linear-gradient(135deg,#ef4444,#1a0505 78%)"
+          },
+          {
+                name: "쉐이킹 타워",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/쉐이킹_타워.png",
+                bg: "linear-gradient(135deg,#eab308,#1a1303 78%)"
+          },
+          {
+                name: "스머프 사다리게임",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/스머프_사다리게임.png",
+                bg: "linear-gradient(135deg,#14b8a6,#061716 78%)"
+          },
+          {
+                name: "스플렌더 확장 찬란한 도시",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/스플렌더_확장___찬란한_도시.png",
+                bg: "linear-gradient(135deg,#6b7280,#111827 78%)"
+          },
+          {
+                name: "아브라카왓",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/아브라카왓-1.png",
+                bg: "linear-gradient(135deg,#8b5cf6,#160b2e 78%)"
+          },
+          {
+                name: "아줄 확장 크리스탈 모자이크",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/아줄_확장___크리스탈_모자이크.png",
+                bg: "linear-gradient(135deg,#0ea5e9,#061420 78%)"
+          },
+          {
+                name: "알쏭달쏭 열고개 전 세계의 나라 편",
+                players: [
+                      2,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "추리",
+                      "심리"
+                ],
+                image: "assets/boardgames/알쏭달쏭_열고개___전_세계의_나라_편.png",
+                bg: "linear-gradient(135deg,#22c55e,#071a0d 78%)"
+          },
+          {
+                name: "알쏭달쏭 열고개 전 세계의 음식 편",
+                players: [
+                      2,
+                      6
+                ],
+                time: 30,
+                genres: [
+                      "추리",
+                      "심리"
+                ],
+                image: "assets/boardgames/알쏭달쏭_열고개___전_세계의_음식_편.png",
+                bg: "linear-gradient(135deg,#f97316,#1a0c03 78%)"
+          },
+          {
+                name: "엘도라도확장무이스카",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/엘도라도확장무이스카.png",
+                bg: "linear-gradient(135deg,#ef4444,#1a0505 78%)"
+          },
+          {
+                name: "옛날 옛적에",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/옛날_옛적에.png",
+                bg: "linear-gradient(135deg,#eab308,#1a1303 78%)"
+          },
+          {
+                name: "우봉고 미니",
+                players: [
+                      2,
+                      4
+                ],
+                time: 25,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/우봉고_미니.png",
+                bg: "linear-gradient(135deg,#14b8a6,#061716 78%)"
+          },
+          {
+                name: "워드 캡처 티키타카",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/워드_캡처_티키타카-1.png",
+                bg: "linear-gradient(135deg,#6b7280,#111827 78%)"
+          },
+          {
+                name: "일곱 마리 양",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/일곱_마리_양.jpg",
+                bg: "linear-gradient(135deg,#8b5cf6,#160b2e 78%)"
+          },
+          {
+                name: "장난꾸러기 나방",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/장난꾸러기_나방-1.png",
+                bg: "linear-gradient(135deg,#0ea5e9,#061420 78%)"
+          },
+          {
+                name: "젬블로큐",
+                players: [
+                      2,
+                      4
+                ],
+                time: 25,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/젬블로큐.png",
+                bg: "linear-gradient(135deg,#22c55e,#071a0d 78%)"
+          },
+          {
+                name: "챠오챠오",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/챠오챠오-1.png",
+                bg: "linear-gradient(135deg,#f97316,#1a0c03 78%)"
+          },
+          {
+                name: "캐스캐디아 프로모 동물 점수 카드 팩",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/캐스캐디아_프로모_동물_점수_카드_팩.jpg",
+                bg: "linear-gradient(135deg,#ef4444,#1a0505 78%)"
+          },
+          {
+                name: "콰왈레",
+                players: [
+                      2,
+                      4
+                ],
+                time: 25,
+                genres: [
+                      "공간",
+                      "전략"
+                ],
+                image: "assets/boardgames/콰왈레.png",
+                bg: "linear-gradient(135deg,#eab308,#1a1303 78%)"
+          },
+          {
+                name: "쿠키박스",
+                players: [
+                      2,
+                      6
+                ],
+                time: 20,
+                genres: [
+                      "재미",
+                      "파티"
+                ],
+                image: "assets/boardgames/쿠키박스.png",
+                bg: "linear-gradient(135deg,#14b8a6,#061716 78%)"
+          },
+          {
+                name: "크레이지 타임",
+                players: [
+                      2,
+                      4
+                ],
+                time: 30,
+                genres: [
+                      "재미",
+                      "전략"
+                ],
+                image: "assets/boardgames/크레이지_타임.png",
+                bg: "linear-gradient(135deg,#6b7280,#111827 78%)"
+          },
+          {
+                name: "크베들린부르크의 돌팔이 약장수",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/크베들린부르크의_돌팔이_약장수.png",
+                bg: "linear-gradient(135deg,#8b5cf6,#160b2e 78%)"
+          },
+          {
+                name: "클라스크 오리지널 스페어 파츠",
+                players: [
+                      2,
+                      8
+                ],
+                time: 30,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/클라스크_오리지널_스페어_파츠.png",
+                bg: "linear-gradient(135deg,#0ea5e9,#061420 78%)"
+          },
+          {
+                name: "탑탑",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/탑탑-1.png",
+                bg: "linear-gradient(135deg,#22c55e,#071a0d 78%)"
+          },
+          {
+                name: "페루도",
+                players: [
+                      2,
+                      8
+                ],
+                time: 25,
+                genres: [
+                      "심리",
+                      "파티"
+                ],
+                image: "assets/boardgames/페루도.png",
+                bg: "linear-gradient(135deg,#f97316,#1a0c03 78%)"
+          },
+          {
+                name: "펭귄 얼음 깨기",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/펭귄_얼음_깨기.png",
+                bg: "linear-gradient(135deg,#ef4444,#1a0505 78%)"
+          },
+          {
+                name: "할리갈리 딜럭스",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/할리갈리_딜럭스.jpg",
+                bg: "linear-gradient(135deg,#eab308,#1a1303 78%)"
+          },
+          {
+                name: "할리갈리 링엘딩",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/할리갈리_링엘딩.png",
+                bg: "linear-gradient(135deg,#14b8a6,#061716 78%)"
+          },
+          {
+                name: "할리갈리 익스트림",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/할리갈리_익스트림-1.png",
+                bg: "linear-gradient(135deg,#6b7280,#111827 78%)"
+          },
+          {
+                name: "할리갈리 카카오프렌즈",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/할리갈리_카카오프렌즈.png",
+                bg: "linear-gradient(135deg,#8b5cf6,#160b2e 78%)"
+          },
+          {
+                name: "할리갈리 컵스 딜럭스",
+                players: [
+                      2,
+                      8
+                ],
+                time: 15,
+                genres: [
+                      "액션",
+                      "파티"
+                ],
+                image: "assets/boardgames/할리갈리_컵스_딜럭스-1.png",
+                bg: "linear-gradient(135deg,#0ea5e9,#061420 78%)"
+          },
+          {
+                name: "햄버거 타이쿤",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/햄버거_타이쿤-1.png",
+                bg: "linear-gradient(135deg,#22c55e,#071a0d 78%)"
+          },
+          {
+                name: "황금의 땅 엘도라도 프로모 카드2&3",
+                players: [
+                      2,
+                      4
+                ],
+                time: 45,
+                genres: [
+                      "전략",
+                      "재미"
+                ],
+                image: "assets/boardgames/황금의_땅_엘도라도_프로모_카드2_3.png",
+                bg: "linear-gradient(135deg,#f97316,#1a0c03 78%)"
+          }
+    ];
+
+    function playerLabel(game) {
+      return game.players[0] === game.players[1] ? String(game.players[0]) : `${game.players[0]}-${game.players[1]}`;
+    }
+
+    function genreLabel(game) {
+      return game.genres.join("/");
+    }
+
+    function getSelectedGenres() {
+      return [...document.querySelectorAll("#genreGrid .choice[aria-selected='true'] strong")]
+        .map(item => item.innerText.trim());
+    }
+
+    function getRandomAiGenres() {
+      const genres = ["재미", "추리", "액션", "심리", "전략", "수학", "공간", "파티"];
+      return genres
+        .map(genre => ({ genre, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .slice(0, 2)
+        .map(item => item.genre);
+    }
+
+    function createAllGameCard(game) {
+      return `
+        <article class="all-game-card explore-card relative" data-tags="${game.genres.join(" ")}" style="background:${game.bg};">
+          <img alt="${game.name}" src="${game.image}">
+          <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-3">
+            <h2 class="truncate text-[18px] leading-5 text-text">${game.name}</h2>
+            <div class="mt-2 flex gap-2">
+              <span class="meta-pill">${playerLabel(game)}</span>
+              <span class="meta-pill">${game.time}</span>
+              <span class="meta-pill">${genreLabel(game)}</span>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function createResultCard(game, index) {
+      const hero = index === 0;
+      return `
+        <article class="game-card ${hero ? "selected result-hero-card" : "result-side-card"} rounded-2xl border transition cursor-pointer" data-game="${game.name}" data-min-players="${game.players[0]}" data-max-players="${game.players[1]}" data-time="${game.time}" data-tags="${game.genres.join(" ")}" style="order:${index}">
+          <img class="result-card-image contain" alt="${game.name}" src="${game.image}">
+          <div class="result-info">
+            ${hero ? `<div class="mb-2 flex flex-wrap gap-2"><span class="modal-tag primary">조건 충족</span>${game.genres.map(tag => `<span class="modal-tag">${tag}</span>`).join("")}</div>` : ""}
+            <h3 class="${hero ? "text-3xl font-extrabold" : "text-xl font-bold"} text-white">${game.name}</h3>
+            <p class="mt-1 text-primary ${hero ? "font-bold" : "text-sm font-bold"}">${gameSubtitles[game.name] || "조건과 취향에 맞춘 추천 보드게임"}</p>
+            <p class="result-description mt-2 ${hero ? "text-base leading-7" : "text-sm leading-6"}">${gameDescriptions[game.name] || `${game.name}은 현재 인원과 시간 안에서 즐기기 좋은 보드게임입니다.`}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <span class="meta-pill">${playerLabel(game)}</span>
+              <span class="meta-pill">${game.time}</span>
+              <span class="meta-pill">${genreLabel(game)}</span>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function bindExploreCards() {
+      document.querySelectorAll(".explore-card").forEach(card => {
+        if (card.dataset.bound === "true") return;
+        card.dataset.bound = "true";
+        card.addEventListener("click", () => openGameModal(card));
+      });
+    }
+
+    function bindResultCards() {
+      document.querySelectorAll(".game-card").forEach(card => {
+        if (card.dataset.bound === "true") return;
+        card.dataset.bound = "true";
+        card.addEventListener("click", () => {
+          document.querySelectorAll(".game-card").forEach(item => item.classList.remove("selected"));
+          card.classList.add("selected");
+          selectedGame = card.dataset.game;
+        });
+      });
+    }
+
+    function renderAllGames() {
+      document.getElementById("allGameGrid").innerHTML = boardGames.map(createAllGameCard).join("");
+      bindExploreCards();
+    }
+
+    function renderRecommendationResults(games) {
+      document.querySelector(".results-grid").innerHTML = games.map((game, index) => createResultCard(game, index)).join("");
+      bindResultCards();
+      if (games.length > 0) selectedGame = games[0].name;
+    }
+
+    function createPostReviewCard(game, index) {
+      const labels = ["AI 추천 pick", "유사 취향 pick", "비슷한 조건 pick"];
+      const icons = ["auto_awesome", "group", "local_fire_department"];
+      return `
+        <article class="post-review-card explore-card" data-tags="${game.genres.join(" ")}">
+          <img alt="${game.name}" src="${game.image}">
+          <div class="post-review-badge">
+            <span class="material-symbols-outlined text-[16px]" style="font-variation-settings:'FILL' 1">${icons[index] || "auto_awesome"}</span>
+            <span>${labels[index] || "추천 pick"}</span>
+          </div>
+          <div class="post-review-card-body">
+            <h3 class="text-2xl font-extrabold text-[#fedad8] drop-shadow-md">${game.name}</h3>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <span class="meta-pill">${playerLabel(game)}</span>
+              <span class="meta-pill">${game.time}</span>
+              <span class="meta-pill">${genreLabel(game)}</span>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderPostReviewRecommendations() {
+      const playerCount = Number(document.getElementById("players").innerText);
+      const maxMinutes = Number(document.getElementById("minutes").innerText);
+      const playedGame = boardGames.find(game => game.name === selectedReviewGame) || boardGames.find(game => game.name === selectedGame);
+      const playedGenres = playedGame?.genres || [];
+      const liked = reviewRatings[selectedReviewGame]?.rating === "만족";
+      const picks = boardGames
+        .filter(game => game.name !== selectedReviewGame)
+        .filter(game => playerCount >= game.players[0] && playerCount <= game.players[1])
+        .filter(game => game.time <= maxMinutes)
+        .map((game, index) => {
+          const overlap = game.genres.filter(genre => playedGenres.includes(genre)).length;
+          const genreScore = liked ? overlap : -overlap;
+          return { game, index, score: genreScore * 10 - Math.abs(game.time - (playedGame?.time || game.time)) };
+        })
+        .sort((a, b) => b.score - a.score || a.index - b.index)
+        .slice(0, 3)
+        .map(item => item.game);
+      const fallback = boardGames.filter(game => game.name !== selectedReviewGame).slice(0, 3);
+      const finalPicks = picks.length > 0 ? picks : fallback;
+      document.getElementById("postReviewGrid").innerHTML = finalPicks.map(createPostReviewCard).join("");
+      bindExploreCards();
+    }
+
+    function show(name, pushHistory = true) {
+      const fromIndex = order.indexOf(current);
+      const toIndex = order.indexOf(name);
+      const direction = toIndex >= fromIndex ? "forward" : "back";
+      screens.forEach(screen => {
+        if (screen.dataset.screen === current && current !== name) {
+          screen.classList.add(direction === "forward" ? "leaving-forward" : "leaving-back");
+          setTimeout(() => screen.classList.remove("leaving-forward", "leaving-back"), 520);
+        }
+        screen.classList.toggle("active", screen.dataset.screen === name);
+        if (screen.dataset.screen === name) screen.scrollTop = 0;
+      });
+      current = name;
+      if (pushHistory && historyStack[historyStack.length - 1] !== name) {
+        historyStack.push(name);
+      }
+      const flowIndex = ["home", "conditions", "genres", "results", "play", "review", "done"].indexOf(name);
+      const progressIndex = Math.min(Math.max(flowIndex, 0), 4);
+      dots.forEach((dot, index) => dot.classList.toggle("active", index <= progressIndex));
+      document.getElementById("backBtn").style.opacity = "1";
+      document.getElementById("navIcon").innerText = name === "home" ? "menu" : "arrow_back";
+      document.getElementById("headerTitle").innerText = name === "home" ? "게임 탐색" : name === "allGames" ? "전체 보드게임" : "Parade";
+      document.getElementById("progressDots").style.display = name === "home" || name === "allGames" ? "none" : "";
+    }
+
+    document.querySelectorAll(".next").forEach(button => {
+      button.addEventListener("click", () => {
+        if (button.dataset.recommendationMode) {
+          recommendationMode = button.dataset.recommendationMode;
+          document.getElementById("resultsTitle").innerText = recommendationMode === "history" ? "AI 플레이 기록 추천 결과" : "장르 기반 추천 결과";
+          applyRecommendationFilters();
+        }
+        if (button.dataset.next === "play") {
+          document.getElementById("playingGame").innerText = selectedGame;
+        }
+        if (button.dataset.next === "review") {
+          selectReviewGame(selectedGame);
+        }
+        show(button.dataset.next);
+      });
+    });
+
+    document.getElementById("backBtn").addEventListener("click", () => {
+      if (current === "home") return;
+      historyStack.pop();
+      const previous = historyStack[historyStack.length - 1] || "home";
+      show(previous, false);
+    });
+
+    document.getElementById("headerTitle").addEventListener("click", () => {
+      show("home");
+    });
+
+    document.querySelectorAll(".step").forEach(button => {
+      button.addEventListener("click", () => {
+        const target = document.getElementById(button.dataset.target);
+        const nextValue = Number(target.innerText) + Number(button.dataset.delta);
+        const min = button.dataset.target === "players" ? 1 : 10;
+        const max = button.dataset.target === "players" ? 12 : 240;
+        target.innerText = Math.max(min, Math.min(max, nextValue));
+        target.animate([{ transform: "scale(1.18)" }, { transform: "scale(1)" }], { duration: 180, easing: "ease-out" });
+      });
+    });
+
+    document.querySelectorAll("#genreGrid .choice").forEach(button => {
+      button.addEventListener("click", () => {
+        const selected = button.getAttribute("aria-selected") === "true";
+        button.setAttribute("aria-selected", String(!selected));
+      });
+    });
+
+    document.querySelectorAll(".game-card").forEach(card => {
+      card.addEventListener("click", () => {
+        document.querySelectorAll(".game-card").forEach(item => item.classList.remove("selected"));
+        card.classList.add("selected");
+        selectedGame = card.dataset.game;
+      });
+    });
+
+    function applyRecommendationFilters() {
+      const playerCount = Number(document.getElementById("players").innerText);
+      const maxMinutes = Number(document.getElementById("minutes").innerText);
+      const selectedGenres = recommendationMode === "history" ? getRandomAiGenres() : getSelectedGenres();
+      const candidates = boardGames
+        .filter(game => playerCount >= game.players[0] && playerCount <= game.players[1])
+        .filter(game => game.time <= maxMinutes)
+        .map((game, index) => {
+          const genreMatches = selectedGenres.filter(genre => game.genres.includes(genre)).length;
+          const genreScore = selectedGenres.length === 0 ? 0 : genreMatches / selectedGenres.length;
+          return { game, index, genreMatches, genreScore };
+        })
+        .sort((a, b) =>
+          b.genreScore - a.genreScore ||
+          b.genreMatches - a.genreMatches ||
+          a.game.time - b.game.time ||
+          a.index - b.index
+        )
+        .slice(0, 5)
+        .map(item => item.game);
+
+      renderRecommendationResults(candidates);
+
+      const genreText = selectedGenres.length > 0
+        ? recommendationMode === "history" ? ` · AI가 고른 ${selectedGenres.join(", ")} 기준` : ` · ${selectedGenres.join(", ")}에 가까운 순`
+        : " · 장르 미선택";
+      document.getElementById("resultsConditionNote").innerText = `${playerCount}명이 가능하고 ${maxMinutes}분 안에 끝나는 게임${genreText}`;
+      document.getElementById("noResults").classList.toggle("hidden", candidates.length > 0);
+      document.getElementById("resultsPlayButton").classList.toggle("hidden", candidates.length === 0);
+
+      if (candidates.length === 0) {
+        document.querySelector(".results-grid").innerHTML = "";
+        selectedGame = "";
+      }
+    }
+
+    function openGameModal(card) {
+      const title = card.querySelector("h2")?.innerText?.trim() || card.querySelector("h3")?.innerText?.trim() || card.querySelector("img")?.alt || "보드게임";
+      const image = card.querySelector("img")?.getAttribute("src") || "";
+      const meta = [...card.querySelectorAll(".meta-pill")].map(item => item.innerText.trim()).filter(Boolean);
+      const players = meta[0] ? `${meta[0]}인` : "2-4인";
+      const time = meta[1] ? `${meta[1]}분` : "30분";
+      const tags = meta[2] ? meta[2].split("/") : ["추천"];
+      modalGameName = title;
+      document.getElementById("modalTitle").innerText = title;
+      document.getElementById("modalImage").src = image;
+      document.getElementById("modalImage").alt = title;
+      document.getElementById("modalSubtitle").innerText = gameSubtitles[title] || "취향에 맞춰 살펴볼 수 있는 보드게임";
+      document.getElementById("modalDescription").innerText = gameDescriptions[title] || `${title}의 기본 정보와 플레이 조건을 확인할 수 있습니다. 인원, 시간, 장르를 보고 지금 멤버에게 맞는지 판단해 보세요.`;
+      document.getElementById("modalPlayers").innerText = players;
+      document.getElementById("modalTime").innerText = time;
+      document.getElementById("modalMeta").innerHTML = [`쉬움 난이도`, ...tags].map((text, index) => `<span class="modal-tag ${index === 0 ? "primary" : ""}">${text}</span>`).join("");
+      document.getElementById("gameModal").classList.add("open");
+      document.getElementById("gameModal").setAttribute("aria-hidden", "false");
+    }
+
+    function closeGameModal() {
+      document.getElementById("gameModal").classList.remove("open");
+      document.getElementById("gameModal").setAttribute("aria-hidden", "true");
+    }
+
+    document.querySelectorAll(".explore-card").forEach(card => {
+      card.addEventListener("click", () => openGameModal(card));
+    });
+
+    document.getElementById("modalClose").addEventListener("click", closeGameModal);
+    document.getElementById("modalBackdrop").addEventListener("click", closeGameModal);
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") closeGameModal();
+    });
+
+    document.getElementById("modalRecommend").addEventListener("click", () => {
+      selectedGame = modalGameName || selectedGame;
+      closeGameModal();
+      show("conditions");
+    });
+
+    document.getElementById("modalSelect").addEventListener("click", () => {
+      selectedGame = modalGameName || selectedGame;
+      closeGameModal();
+      document.getElementById("playingGame").innerText = selectedGame;
+      show("play");
+    });
+
+    function renderReviewState() {
+      const saved = reviewRatings[selectedReviewGame] || {};
+      selectedReview = saved.rating || "";
+      document.getElementById("reviewGameTitle").innerText = selectedReviewGame;
+      document.getElementById("reviewText").value = saved.text || "";
+      document.querySelectorAll(".review-game").forEach(button => {
+        button.setAttribute("aria-selected", String(button.dataset.game === selectedReviewGame));
+      });
+      document.querySelectorAll(".review").forEach(button => {
+        button.setAttribute("aria-selected", String(button.dataset.review === selectedReview));
+      });
+    }
+
+    function bindReviewGameButton(button) {
+      button.addEventListener("click", () => {
+        selectReviewGame(button.dataset.game);
+      });
+    }
+
+    function ensureReviewGameOption(gameName) {
+      const existing = [...document.querySelectorAll(".review-game")].some(button => button.dataset.game === gameName);
+      if (existing) return;
+      const button = document.createElement("button");
+      button.className = "review-game rounded-full border border-white/10 bg-black/30 px-4 py-2 text-sm font-bold text-muted transition";
+      button.setAttribute("aria-selected", "false");
+      button.dataset.game = gameName;
+      button.innerText = gameName;
+      bindReviewGameButton(button);
+      document.getElementById("reviewGamePicker").appendChild(button);
+    }
+
+    function selectReviewGame(gameName) {
+      ensureReviewGameOption(gameName);
+      selectedReviewGame = gameName;
+      renderReviewState();
+    }
+
+    document.querySelectorAll(".review-game").forEach(button => {
+      bindReviewGameButton(button);
+    });
+
+    document.querySelectorAll(".review").forEach(button => {
+      button.addEventListener("click", () => {
+        selectedReview = button.dataset.review;
+        reviewRatings[selectedReviewGame] = {
+          ...(reviewRatings[selectedReviewGame] || {}),
+          rating: selectedReview,
+          text: document.getElementById("reviewText").value
+        };
+        renderReviewState();
+      });
+    });
+
+    document.getElementById("reviewText").addEventListener("input", event => {
+      reviewRatings[selectedReviewGame] = {
+        ...(reviewRatings[selectedReviewGame] || {}),
+        rating: selectedReview,
+        text: event.target.value
+      };
+    });
+
+    document.getElementById("finishBtn").addEventListener("click", () => {
+      if (!selectedReview) {
+        const toast = document.getElementById("toast");
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 1100);
+        return;
+      }
+      reviewRatings[selectedReviewGame] = {
+        rating: selectedReview,
+        text: document.getElementById("reviewText").value
+      };
+      renderPostReviewRecommendations();
+      show("done");
+    });
+
+    document.querySelectorAll(".filter-chip").forEach(button => {
+      button.addEventListener("click", () => {
+        const filter = button.dataset.filter;
+        document.querySelectorAll(".filter-chip").forEach(item => item.setAttribute("aria-pressed", "false"));
+        button.setAttribute("aria-pressed", "true");
+        document.querySelectorAll(".all-game-card").forEach(card => {
+          const tags = card.dataset.tags.split(/\s+/);
+          const visible = filter === "all" || tags.includes(filter);
+          card.classList.toggle("is-hidden", !visible);
+        });
+      });
+    });
+
+    renderAllGames();
+    renderRecommendationResults(boardGames.slice(0, 5));
+    show("home", false);
+  </script>
+</body>
+</html>
