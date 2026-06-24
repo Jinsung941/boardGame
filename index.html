@@ -756,11 +756,7 @@
                 <span><span class="block text-sm text-[#8f8f8f]">평균 소요 시간</span><strong id="modalTime" class="text-xl text-white">20분</strong></span>
               </div>
             </div>
-            <div class="mt-9 grid gap-4 sm:grid-cols-2">
-              <button id="modalRecommend" class="rounded-xl bg-[#383838] px-5 py-5 font-bold text-white active:scale-[.98] transition hover:bg-[#444] flex items-center justify-center gap-2">
-                <span class="material-symbols-outlined">auto_awesome</span>
-                맞춤 보드게임 추천받기
-              </button>
+            <div class="mt-9 grid gap-4">
               <button id="modalSelect" class="rounded-xl bg-primary px-5 py-5 font-bold text-white shadow-glow active:scale-[.98] transition flex items-center justify-center gap-2">
                 <span class="material-symbols-outlined">play_arrow</span>
                 게임 시작하기
@@ -2751,12 +2747,6 @@
     document.getElementById("modalBackdrop").addEventListener("click", closeGameModal);
     document.addEventListener("keydown", event => {
       if (event.key === "Escape") closeGameModal();
-    });
-
-    document.getElementById("modalRecommend").addEventListener("click", () => {
-      selectedGame = modalGameName || selectedGame;
-      closeGameModal();
-      show("conditions");
     });
 
     document.getElementById("modalSelect").addEventListener("click", () => {
